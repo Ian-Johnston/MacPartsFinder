@@ -77,8 +77,10 @@ jobs:
           files: dmgs/*.dmg
           body: |
             Test build of MacPartsFinder, the Mac edition of WinPartsFinder.
-            - **MacPartsFinder-mac-arm64.dmg** - Apple Silicon Macs (M1 and later)
-            - **MacPartsFinder-mac-intel.dmg** - older Intel Macs
+
+            **Download** (click to download straight away):
+            - [MacPartsFinder-mac-arm64.dmg](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/MacPartsFinder-mac-arm64.dmg) - Apple Silicon Macs (M1 and later)
+            - [MacPartsFinder-mac-intel.dmg](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/MacPartsFinder-mac-intel.dmg) - older Intel Macs
 
             Needs macOS 15 (Sequoia) or later.
 
