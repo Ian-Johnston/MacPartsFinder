@@ -1,0 +1,16 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="MacPartsFinder.ImagePopupWindow"
+        Title="Photo"
+        Width="320" Height="320" CanResize="False" Topmost="True" ShowInTaskbar="False"
+        WindowStartupLocation="Manual">
+    <!-- The photo area stays white in both themes - product shots have white backgrounds. -->
+    <DockPanel Tapped="Any_Tapped" Background="White">
+        <TextBlock x:Name="lblCaption" DockPanel.Dock="Bottom" TextWrapping="Wrap" Margin="8,4,8,6" Foreground="#333333" />
+        <Panel>
+            <TextBlock x:Name="lblLoading" Text="Loading photo…" Foreground="#666666"
+                       HorizontalAlignment="Center" VerticalAlignment="Center" />
+            <Image x:Name="picPhoto" IsVisible="False" Stretch="Uniform" />
+        </Panel>
+    </DockPanel>
+</Window>

@@ -1,0 +1,116 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="using:MacPartsFinder"
+        x:Class="MacPartsFinder.SettingsWindow"
+        Title="Settings"
+        Width="900" Height="590" MinWidth="760" MinHeight="520"
+        ShowInTaskbar="False" WindowStartupLocation="CenterOwner">
+
+    <Window.Styles>
+        <Style Selector="Grid#keys > TextBlock">
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+        <Style Selector="Grid#keys > HyperlinkButton">
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="Margin" Value="8,0,0,0" />
+        </Style>
+        <Style Selector="StackPanel#buttons > :is(Control)">
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+        <Style Selector="Button">
+            <Setter Property="HorizontalContentAlignment" Value="Center" />
+        </Style>
+    </Window.Styles>
+
+    <DockPanel Margin="12,10,12,10">
+        <!-- Bottom buttons, as in WinPartsFinder -->
+        <DockPanel DockPanel.Dock="Bottom" Margin="0,10,0,0">
+            <StackPanel x:Name="buttons" DockPanel.Dock="Right" Orientation="Horizontal" Spacing="6">
+                <Button x:Name="btnResetUrls" Content="Reset URLs" MinWidth="110" Click="BtnResetUrls_Click"
+                        ToolTip.Tip="Put the built-in suppliers' search URLs back to the defaults. Your own suppliers are kept." />
+                <Button x:Name="btnResetWindow" Content="Reset main window layout" MinWidth="170" Click="BtnResetWindow_Click"
+                        ToolTip.Tip="Put the main window back to its original size and position, with the default column widths and order.&#10;Happens when you click OK." />
+                <Button x:Name="btnOK" Content="OK" IsDefault="True" MinWidth="85" Click="BtnOK_Click"
+                        ToolTip.Tip="Save these settings. Keys are stored in your macOS Keychain (encrypted for your user on Windows)." />
+                <Button Content="Cancel" IsCancel="True" MinWidth="85" Click="BtnCancel_Click"
+                        ToolTip.Tip="Close without saving any changes." />
+            </StackPanel>
+            <StackPanel Orientation="Horizontal" Spacing="14" VerticalAlignment="Center">
+                <CheckBox x:Name="chkDarkMode" Content="Dark mode" IsCheckedChanged="ChkDarkMode_Changed"
+                          ToolTip.Tip="Switch the whole app to a dark theme. Previews here straight away." />
+                <CheckBox x:Name="chkShowThumbnails" Content="Show part photos"
+                          ToolTip.Tip="Show a small part photo at the start of each result row. Untick for a compact grid." />
+                <CheckBox x:Name="chkShowKeys" Content="Show keys" IsCheckedChanged="ChkShowKeys_Changed"
+                          ToolTip.Tip="Show the API keys as plain text instead of dots." />
+            </StackPanel>
+        </DockPanel>
+
+        <Grid x:Name="keys" DockPanel.Dock="Top" ColumnDefinitions="Auto,*,Auto" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto"
+              RowSpacing="6" ColumnSpacing="10">
+            <TextBlock Grid.Row="0" Text="Mouser Search API key:" />
+            <TextBox Grid.Row="0" Grid.Column="1" x:Name="txtMouserKey" PasswordChar="•"
+                     ToolTip.Tip="Your Mouser Search API key (a long code with dashes).&#10;Leave blank to use Mouser as a website link only." />
+            <HyperlinkButton Grid.Row="0" Grid.Column="2" Content="Get a key" Tag="https://www.mouser.co.uk/api-hub/" Click="KeyLink_Click"
+                             ToolTip.Tip="Opens Mouser's API Hub - sign up there for a free Search API key." />
+
+            <TextBlock Grid.Row="1" Text="DigiKey Client ID:" />
+            <TextBox Grid.Row="1" Grid.Column="1" x:Name="txtDkClientId" PasswordChar="•"
+                     ToolTip.Tip="Client ID of your DigiKey Production App (with ProductInformation V4 ticked)." />
+            <HyperlinkButton Grid.Row="1" Grid.Column="2" Content="Get a key" Tag="https://developer.digikey.com/" Click="KeyLink_Click"
+                             ToolTip.Tip="Opens the DigiKey developer portal - create an Organization, then a Production App." />
+
+            <TextBlock Grid.Row="2" Text="DigiKey Client Secret:" />
+            <TextBox Grid.Row="2" Grid.Column="1" x:Name="txtDkSecret" PasswordChar="•"
+                     ToolTip.Tip="Client Secret of the same DigiKey app. Keep it private, like a password." />
+
+            <TextBlock Grid.Row="3" Text="DigiKey site:" />
+            <StackPanel Grid.Row="3" Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                <ComboBox x:Name="cboDkSite" Width="80" IsEditable="True"
+                          ToolTip.Tip="Which DigiKey country site to price and stock from (UK = digikey.co.uk)." />
+                <TextBlock Text="Currency:" VerticalAlignment="Center" />
+                <ComboBox x:Name="cboDkCurrency" Width="80" IsEditable="True"
+                          ToolTip.Tip="Currency DigiKey prices are shown in." />
+            </StackPanel>
+
+            <TextBlock Grid.Row="4" Text="element14 API key&#10;(Farnell, CPC, Newark):" />
+            <TextBox Grid.Row="4" Grid.Column="1" x:Name="txtE14Key" PasswordChar="•" VerticalAlignment="Center"
+                     ToolTip.Tip="Your element14 Product Search API key. One key covers Farnell, CPC and Newark." />
+            <HyperlinkButton Grid.Row="4" Grid.Column="2" Content="Get a key" Tag="https://partner.element14.com/" Click="KeyLink_Click"
+                             ToolTip.Tip="Opens the element14 partner portal - register an application for a free key." />
+
+            <TextBlock Grid.Row="5" Text="TME Token:" />
+            <TextBox Grid.Row="5" Grid.Column="1" x:Name="txtTmeToken" PasswordChar="•"
+                     ToolTip.Tip="Your TME private key Token (50 characters), from developers.tme.eu > API Token keys > Show private keys.&#10;Leave blank to use TME as a website link only." />
+            <HyperlinkButton Grid.Row="5" Grid.Column="2" Content="Get a key" Tag="https://developers.tme.eu/en" Click="KeyLink_Click"
+                             ToolTip.Tip="Opens the TME developer site - create an application there, then generate a private key (see API Help)." />
+
+            <TextBlock Grid.Row="6" Text="TME Application secret:" />
+            <TextBox Grid.Row="6" Grid.Column="1" x:Name="txtTmeSecret" PasswordChar="•"
+                     ToolTip.Tip="The Application secret (20 characters) of your app at developers.tme.eu. Keep it private, like a password." />
+        </Grid>
+
+        <DockPanel DockPanel.Dock="Top" Margin="0,12,0,4">
+            <Button DockPanel.Dock="Right" Content="API Help" MinWidth="85" Click="BtnApiHelp_Click"
+                    ToolTip.Tip="Step-by-step instructions for getting each supplier's free API keys.&#10;Stays open beside Settings while you paste the keys in." />
+            <TextBlock VerticalAlignment="Center" TextWrapping="Wrap"
+                       Text="Suppliers and website search URLs - {0} is replaced by the search text. Add your own suppliers here:" />
+        </DockPanel>
+
+        <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Spacing="6" Margin="0,6,0,0">
+            <Button Content="Add supplier" MinWidth="110" Click="BtnAddSupplier_Click"
+                    ToolTip.Tip="Add your own supplier: give it a name and a search URL containing {0}.&#10;It shows as a website link in the results." />
+            <Button x:Name="btnDeleteSupplier" Content="Delete supplier" MinWidth="110" Click="BtnDeleteSupplier_Click"
+                    ToolTip.Tip="Delete the selected supplier you added. Built-in suppliers can't be deleted - untick them on the main window instead." />
+        </StackPanel>
+
+        <DataGrid x:Name="gridUrls" HeadersVisibility="Column" GridLinesVisibility="All" CanUserSortColumns="False"
+                  CanUserReorderColumns="False" SelectionMode="Single" RowHeight="24"
+                  BeginningEdit="GridUrls_BeginningEdit" SelectionChanged="GridUrls_SelectionChanged"
+                  ToolTip.Tip="Website search URL for each supplier. {0} is replaced by your search text.&#10;Used for website-link rows and for suppliers without an API. Double-click a URL to edit it.">
+            <DataGrid.Columns>
+                <DataGridTextColumn Header="Supplier" Binding="{Binding Name}" x:DataType="local:UrlRow" Width="160" />
+                <DataGridTextColumn Header="Search URL" Binding="{Binding Url}" x:DataType="local:UrlRow" Width="*" />
+            </DataGrid.Columns>
+        </DataGrid>
+    </DockPanel>
+</Window>

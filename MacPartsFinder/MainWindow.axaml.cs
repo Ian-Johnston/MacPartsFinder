@@ -87,9 +87,18 @@ public partial class MainWindow : Window
         // Right-click selects the row under the mouse first (for the menus), as in WinPartsFinder.
         gridResults.AddHandler(PointerPressedEvent, GridResults_PointerPressed, RoutingStrategies.Tunnel, handledEventsToo: true);
         gridSuppliers.AddHandler(PointerPressedEvent, GridSuppliers_PointerPressed, RoutingStrategies.Tunnel, handledEventsToo: true);
+        // ⌘F (Ctrl+F on Windows) opens Advanced search.
+        AddHandler(KeyDownEvent, (_, e) =>
+        {
+            if (e.Key == Key.F && IsCommandKey(e.KeyModifiers))
+            {
+                e.Handled = true;
+                BtnAdvanced_Click(this, new RoutedEventArgs());
+            }
+        }, RoutingStrategies.Tunnel);
 
         if (!_suppliers.Any(s => s.IsConfigured))
-            SetStatus("No API keys set yet - click API keys… to add Mouser / DigiKey / element14 / TME keys. Until then you get website links.");
+            SetStatus("No API keys set yet - open Settings to add Mouser / DigiKey / element14 / TME keys. Until then you get website links.");
         else
             SetStatus("Ready.");
 
@@ -114,7 +123,9 @@ public partial class MainWindow : Window
         Closing += (_, _) =>
         {
             _cts?.Cancel();
-            SaveUiSettings();
+            SaveUiSettings(); // (closing - nowhere to show an error)
+            _help?.Close();
+            _photoPopup?.Close();
         };
     }
 
@@ -154,7 +165,24 @@ public partial class MainWindow : Window
         };
     }
 
-    private void SaveUiSettings()
+    private void ResetWindowLayout()
+    {
+        WindowState = WindowState.Normal;
+        Width = 1264;
+        Height = 681;
+        var screen = Screens.ScreenFromWindow(this) ?? Screens.Primary;
+        if (screen != null)
+        {
+            var area = screen.WorkingArea;
+            Position = new PixelPoint(area.X + (area.Width - (int)(Width * screen.Scaling)) / 2,
+                                      area.Y + (area.Height - (int)(Height * screen.Scaling)) / 2);
+        }
+        gridMain.ColumnDefinitions[0].Width = new GridLength(440);
+        ApplyColumnLayout(_defaultColumns);
+    }
+
+    /// <summary>Saves the settings, with the window layout and supplier ticks. Returns an error message, or "" if all went well.</summary>
+    private string SaveUiSettings()
     {
         _settings.MainWindow = CurrentWindowPlacement();
         _settings.ResultColumns = CurrentColumnLayout();
@@ -167,12 +195,17 @@ public partial class MainWindow : Window
         try
         {
             _settings.Save();
+            return "";
         }
-        catch
+        catch (Exception ex)
         {
-            // Closing - nowhere to show it. (Keys are saved, with any error shown, from their own window.)
+            return "Could not save settings: " + ex.Message;
         }
     }
+
+    /// <summary>⌘ on a Mac, Ctrl on Windows.</summary>
+    private static bool IsCommandKey(KeyModifiers m) =>
+        m == (OperatingSystem.IsMacOS() ? KeyModifiers.Meta : KeyModifiers.Control);
 
     private int MaxPerSupplier => (int)(nudMax.Value ?? 25);
 
@@ -570,8 +603,42 @@ public partial class MainWindow : Window
         UpdateCountStatus();
     }
 
+    /// <summary>Types… needs some parts to list, and shows how many types are hidden.</summary>
+    private void UpdateTypesButton()
+    {
+        btnTypes.IsEnabled = !_busy && _rows.Any(r => !r.LinkOnly);
+        btnTypes.Content = _hiddenTypes.Count > 0 ? $"Types ({_hiddenTypes.Count} hidden)…" : "Types…";
+    }
+
+    /// <summary>
+    /// Lists every part type in the current results with tick boxes; unticked types are hidden from the grid
+    /// (not deleted) until the next search. Modal, so nothing else can happen until OK or Cancel.
+    /// </summary>
+    private async void BtnTypes_Click(object? sender, RoutedEventArgs e)
+    {
+        if (_busy) return;
+        var types = _rows.Where(r => !r.LinkOnly && !r.Removed)
+            .GroupBy(r => r.Type.Trim(), StringComparer.OrdinalIgnoreCase)
+            .Select(g => new TypeEntry
+            {
+                Name = g.Key,
+                Count = g.Count(),
+                Suppliers = g.Select(r => r.Supplier).Distinct().ToList()
+            })
+            .OrderBy(t => t.Name.Length == 0).ThenBy(t => t.Name, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        if (types.Count == 0) return;
+
+        var hidden = await new TypesWindow(types, _hiddenTypes).ShowDialog<HashSet<string>?>(this);
+        if (hidden == null) return;
+        _hiddenTypes.Clear();
+        _hiddenTypes.UnionWith(hidden);
+        ApplyFilter();
+    }
+
     private void UpdateCountStatus()
     {
+        UpdateTypesButton();
         UpdateTotalParts();
         var shown = _view.Count;
         var total = _rows.Count;
@@ -655,8 +722,9 @@ public partial class MainWindow : Window
 
     private void GridResults_DoubleTapped(object? sender, TappedEventArgs e)
     {
-        // The link cells already act on a single click; headers aren't rows.
+        // The photo and link cells already act on a single click; headers aren't rows.
         if (e.Source is not Control c || c.FindAncestorOfType<HyperlinkButton>(includeSelf: true) != null) return;
+        if (c.GetSelfAndVisualAncestors().OfType<Control>().Any(a => a.Classes.Contains("thumb"))) return;
         if (c.FindAncestorOfType<DataGridRow>(includeSelf: true)?.DataContext is ResultRow r) OpenUrl(r.ProductUrl);
     }
 
@@ -666,6 +734,11 @@ public partial class MainWindow : Window
         if ((e.Key == Key.Delete || e.Key == Key.Back) && e.KeyModifiers == KeyModifiers.None)
         {
             RemoveSelectedRows();
+            e.Handled = true;
+        }
+        else if (e.Key == Key.A && IsCommandKey(e.KeyModifiers))
+        {
+            gridResults.SelectAll();
             e.Handled = true;
         }
     }
@@ -1148,10 +1221,12 @@ public partial class MainWindow : Window
         _busy = busy;
         if (busy) HideRecent();
         btnSearch.IsEnabled = !busy;
+        btnAdvanced.IsEnabled = !busy;
         btnCancel.IsEnabled = busy;
-        btnKeys.IsEnabled = !busy;
+        btnSettings.IsEnabled = !busy;
         Cursor = busy ? new Cursor(StandardCursorType.Wait) : Cursor.Default;
         UpdateLoadMoreButton();
+        UpdateTypesButton();
     }
 
     private void SetStatus(string text)
@@ -1239,14 +1314,124 @@ public partial class MainWindow : Window
 
     #endregion
 
-    #region Keys / export / links
+    #region Advanced search / photo pop-up
 
-    private async void BtnKeys_Click(object? sender, RoutedEventArgs e)
+    private async void BtnAdvanced_Click(object? sender, RoutedEventArgs e)
     {
-        var saved = await new KeysWindow(_settings).ShowDialog<bool>(this);
-        if (!saved) return;
+        if (_busy || !btnAdvanced.IsEffectivelyEnabled) return;
+        HideRecent();
+        // Open with last time's choices, but today's search text, batch size and ticked suppliers.
+        var start = _settings.LastAdvanced;
+        // (Unless Search for was left blank last time and the search box still shows those words.)
+        var typed = (txtSearch.Text ?? "").Trim();
+        if (typed.Length > 0 && !(start.ContainsIsQuery && string.Equals(typed, start.Query, StringComparison.OrdinalIgnoreCase)))
+        {
+            start.Query = typed;
+            start.ContainsIsQuery = false;
+        }
+        start.MaxResults = MaxPerSupplier;
+        start.Suppliers = _supplierRows.Where(i => i.IsChecked).Select(i => i.Name).ToList();
+
+        var o = await new AdvancedSearchWindow(start, _suppliers.Select(s => s.Name).ToList()).ShowDialog<AdvancedSearchOptions?>(this);
+        if (o == null) return;
+        _settings.LastAdvanced = o;
+        _fillingFromRecent = true; // (not typing - no suggestions)
+        txtSearch.Text = o.Query;
+        _fillingFromRecent = false;
+        nudMax.Value = Math.Max(1, Math.Min(50, o.MaxResults));
+
+        // Make the supplier list match the window (without the "ticked after a search" auto-search).
+        _loading = true;
+        foreach (var item in _supplierRows)
+        {
+            item.IsChecked = o.Suppliers.Contains(item.Name);
+            _settings.EnabledSuppliers[item.Name] = item.IsChecked;
+        }
+        _loading = false;
+
+        await RunSearchAsync(o, fromAdvanced: true);
+    }
+
+    private ImagePopupWindow? _photoPopup;
+
+    /// <summary>Click a thumbnail: a bigger photo pops up beside the mouse. One at a time - another click replaces it.</summary>
+    private void Thumb_Tapped(object? sender, TappedEventArgs e)
+    {
+        if ((sender as Control)?.DataContext is not ResultRow row) return;
+        var urls = ImageUrlsFor(row);
+        if (urls.Thumb.Length == 0 || _images.HasFailed(urls.Thumb)) return; // nothing to enlarge
+
+        var title = string.Join(" - ", new[] { row.MfrPartNo, row.Manufacturer }.Where(s => s.Length > 0));
+        _photoPopup?.Close();
+        var popup = new ImagePopupWindow(urls.Large, urls.Thumb, title.Length > 0 ? title : "Photo", row.Description);
+        var at = this.PointToScreen(e.GetPosition(this));
+        var scale = Screens.ScreenFromWindow(this)?.Scaling ?? 1;
+        popup.Position = new PixelPoint(at.X + (int)(16 * scale), at.Y + (int)(16 * scale));
+        popup.Closed += (_, _) =>
+        {
+            if (_photoPopup == popup) _photoPopup = null;
+        };
+        _photoPopup = popup;
+        popup.Show(this);
+    }
+
+    #endregion
+
+    #region Settings / help / export / links
+
+    private async void BtnSettings_Click(object? sender, RoutedEventArgs e)
+    {
+        HideRecent();
+        var dlg = new SettingsWindow(_settings);
+        if (!await dlg.ShowDialog<bool>(this)) return;
+        if (dlg.ResetWindowRequested) ResetWindowLayout();
+        var error = SaveUiSettings();
+        SettingsWindow.ApplyTheme(_settings.DarkMode);
         RebuildSuppliers();
-        SetStatus("API keys saved.");
+        ApplyThumbnailSetting();
+        // Rows already on screen pick up the photo setting when they're next shown.
+        if (_settings.ShowThumbnails) RefreshThumbsOnScreen();
+        if (error.Length > 0)
+        {
+            await MessageBox.Show(this, error, Title ?? "");
+            SetStatus(error);
+        }
+        else
+        {
+            SetStatus("Settings saved.");
+        }
+    }
+
+    /// <summary>After turning photos on: fetch them for every row (the grid shows the ones on screen).</summary>
+    private void RefreshThumbsOnScreen()
+    {
+        foreach (var r in _view.Cast<ResultRow>().Take(200))
+        {
+            EnsureThumb(r);
+        }
+    }
+
+    // Help stays open (not modal) so it can be read while using the app; one window at a time.
+    private HelpWindow? _help;
+
+    private void BtnHelp_Click(object? sender, RoutedEventArgs e)
+    {
+        if (_help != null)
+        {
+            _help.Activate();
+            return;
+        }
+        _help = new HelpWindow();
+        _help.Closed += (_, _) => _help = null;
+        _help.Show(this);
+    }
+
+    private void BtnAbout_Click(object? sender, RoutedEventArgs e) => ShowAbout();
+
+    /// <summary>Also used by the Mac's app menu (MacPartsFinder > About MacPartsFinder).</summary>
+    public async void ShowAbout()
+    {
+        await new AboutWindow().ShowDialog(this);
     }
 
     private List<DataGridColumn> VisibleColumns()

@@ -19,4 +19,9 @@
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
     <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="10.0.13" />
   </ItemGroup>
+
+  <ItemGroup>
+    <!-- Images built into the app (the About window's cartoon) -->
+    <AvaloniaResource Include="Assets\**" />
+  </ItemGroup>
 </Project>

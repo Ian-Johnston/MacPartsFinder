@@ -1,0 +1,94 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="using:MacPartsFinder"
+        x:Class="MacPartsFinder.AdvancedSearchWindow"
+        Title="Advanced search"
+        Width="560" Height="610" MinWidth="540" MinHeight="590"
+        ShowInTaskbar="False" WindowStartupLocation="CenterOwner">
+
+    <Window.Styles>
+        <Style Selector="Grid#form > TextBlock">
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+        <Style Selector="Button">
+            <Setter Property="HorizontalContentAlignment" Value="Center" />
+            <Setter Property="MinWidth" Value="85" />
+        </Style>
+        <Style Selector="ListBox#lstSuppliers ListBoxItem">
+            <Setter Property="Padding" Value="6,1" />
+            <Setter Property="MinHeight" Value="0" />
+        </Style>
+    </Window.Styles>
+
+    <DockPanel Margin="14,12,14,12">
+        <DockPanel DockPanel.Dock="Bottom" Margin="0,10,0,0">
+            <Button DockPanel.Dock="Left" Content="Clear" Click="BtnClear_Click" ToolTip.Tip="Reset every option to its default." />
+            <StackPanel Orientation="Horizontal" Spacing="6" HorizontalAlignment="Right">
+                <Button Content="Search" IsDefault="True" Click="BtnSearch_Click" />
+                <Button Content="Cancel" IsCancel="True" Click="BtnCancel_Click" />
+            </StackPanel>
+        </DockPanel>
+
+        <TextBlock DockPanel.Dock="Bottom" TextWrapping="Wrap" Margin="0,10,0,0" Foreground="{DynamicResource MutedTextBrush}"
+                   Text="In stock / RoHS are applied by the suppliers themselves (TME has no RoHS option). The &quot;Then only show&quot; filters, quantity and price are applied to what comes back. Leave anything blank or 0 to ignore it." />
+
+        <Grid x:Name="form" ColumnDefinitions="Auto,*" RowSpacing="6" ColumnSpacing="10"
+              RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,*">
+            <TextBlock Grid.Row="0" Text="Search for:" />
+            <TextBox Grid.Row="0" Grid.Column="1" x:Name="txtQuery"
+                     ToolTip.Tip="Part number, keywords or a supplier order code (2-40 characters for TME).&#10;Leave blank to search for the Manufacturer part no. contains and Description also contains text instead." />
+
+            <TextBlock Grid.Row="1" Text="Search type:" />
+            <ComboBox Grid.Row="1" Grid.Column="1" x:Name="cboMode" HorizontalAlignment="Stretch"
+                      ToolTip.Tip="Keyword: descriptions and part numbers.&#10;Manufacturer part no.: starts with what you typed.&#10;Exact: only that exact manufacturer part number.&#10;Supplier order code: e.g. a Farnell, CPC, Mouser, DigiKey or TME number - finds that part, then searches every other supplier for the same part." />
+
+            <TextBlock Grid.Row="2" Text="Suppliers filter:" FontWeight="Bold" Margin="0,6,0,0" />
+            <StackPanel Grid.Row="2" Grid.Column="1" Orientation="Horizontal" Spacing="16" Margin="0,6,0,0">
+                <CheckBox x:Name="chkInStock" Content="In stock only"
+                          ToolTip.Tip="The suppliers send only parts they have in stock, so you get a full page of in-stock parts." />
+                <CheckBox x:Name="chkRohs" Content="RoHS compliant only"
+                          ToolTip.Tip="The suppliers send only RoHS compliant parts (Mouser, DigiKey, Farnell, CPC, Newark - TME has no RoHS search option)." />
+            </StackPanel>
+
+            <TextBlock Grid.Row="3" Text="Then only show:" FontWeight="Bold" Margin="0,6,0,0" />
+            <CheckBox Grid.Row="3" Grid.Column="1" x:Name="chkActive" Content="Active parts (hide obsolete / not recommended)" Margin="0,6,0,0"
+                      ToolTip.Tip="Leave out parts whose status says obsolete, discontinued, not recommended for new designs, end of life etc." />
+
+            <TextBlock Grid.Row="4" Text="Manufacturer name contains:" />
+            <TextBox Grid.Row="4" Grid.Column="1" x:Name="txtMaker"
+                     ToolTip.Tip="Only parts whose manufacturer (the maker's name) contains this, e.g. Texas or Analog. Not the part number." />
+
+            <TextBlock Grid.Row="5" Text="Manufacturer part no. contains:" />
+            <TextBox Grid.Row="5" Grid.Column="1" x:Name="txtPartNo"
+                     ToolTip.Tip="Only parts whose manufacturer part number contains this, anywhere in it, e.g. 931G finds KSC931G LFS.&#10;Tip: leave Search for blank and put what the part is in Description also contains, e.g. switch -&#10;the two are then searched for together. DigiKey and Mouser match part of a number; Farnell, CPC and Newark don't." />
+
+            <TextBlock Grid.Row="6" Text="Description also contains:" />
+            <TextBox Grid.Row="6" Grid.Column="1" x:Name="txtContains"
+                     ToolTip.Tip="Only parts whose description (or part number) contains all of these words, e.g. SOIC or 0603 X7R.&#10;With Search for blank, these words become the search instead (matched the suppliers' own way)." />
+
+            <TextBlock Grid.Row="7" Text="Quantity needed:" />
+            <NumericUpDown Grid.Row="7" Grid.Column="1" x:Name="nudQty" Width="140" HorizontalAlignment="Left"
+                           Minimum="0" Maximum="1000000" Increment="1" FormatString="0"
+                           ToolTip.Tip="How many you need. Prices are then shown at that quantity, and parts with a higher minimum order are left out. 0 = ignore." />
+
+            <TextBlock Grid.Row="8" Text="Max price each:" />
+            <TextBox Grid.Row="8" Grid.Column="1" x:Name="txtMaxPrice" Width="140" HorizontalAlignment="Left"
+                     ToolTip.Tip="Leave out parts costing more than this each (at the quantity above). Blank = no limit." />
+
+            <TextBlock Grid.Row="9" Text="Results per supplier:" />
+            <NumericUpDown Grid.Row="9" Grid.Column="1" x:Name="nudMax" Width="140" HorizontalAlignment="Left"
+                           Minimum="1" Maximum="50" Increment="1" FormatString="0"
+                           ToolTip.Tip="How many results to fetch from each supplier (up to 50). Load more works as normal afterwards." />
+
+            <TextBlock Grid.Row="10" Text="Suppliers to search:" VerticalAlignment="Top" Margin="0,6,0,0" />
+            <ListBox Grid.Row="10" Grid.RowSpan="3" Grid.Column="1" x:Name="lstSuppliers" Margin="0,6,0,0"
+                     ToolTip.Tip="Which suppliers to search. The supplier list on the main window is updated to match.">
+                <ListBox.ItemTemplate>
+                    <DataTemplate x:DataType="local:CheckItem">
+                        <CheckBox IsChecked="{Binding IsChecked}" Content="{Binding Name}" MinHeight="0" />
+                    </DataTemplate>
+                </ListBox.ItemTemplate>
+            </ListBox>
+        </Grid>
+    </DockPanel>
+</Window>

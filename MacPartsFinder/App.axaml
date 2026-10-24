@@ -1,8 +1,16 @@
 <Application xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              x:Class="MacPartsFinder.App"
+             Name="MacPartsFinder"
              RequestedThemeVariant="Light">
              <!-- Light or Dark is set from the Dark mode setting when the main window opens. -->
+
+    <!-- The Mac's app menu (MacPartsFinder > About MacPartsFinder). Windows ignores it. -->
+    <NativeMenu.Menu>
+        <NativeMenu>
+            <NativeMenuItem Header="About MacPartsFinder" Click="AboutMenu_Click" />
+        </NativeMenu>
+    </NativeMenu.Menu>
 
     <Application.Resources>
         <ResourceDictionary>

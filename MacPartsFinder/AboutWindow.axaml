@@ -1,0 +1,71 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="MacPartsFinder.AboutWindow"
+        Title="About MacPartsFinder"
+        Width="1080" Height="670" CanResize="False" ShowInTaskbar="False"
+        WindowStartupLocation="CenterOwner">
+
+    <Window.Styles>
+        <Style Selector="StackPanel#left > TextBlock.head">
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="FontWeight" Value="Bold" />
+            <Setter Property="Margin" Value="0,12,0,0" />
+        </Style>
+        <Style Selector="StackPanel#left > TextBlock.body">
+            <Setter Property="TextWrapping" Value="Wrap" />
+            <Setter Property="MaxWidth" Value="584" />
+            <Setter Property="HorizontalAlignment" Value="Left" />
+        </Style>
+        <Style Selector="Canvas HyperlinkButton">
+            <Setter Property="Padding" Value="0" />
+        </Style>
+    </Window.Styles>
+
+    <Grid ColumnDefinitions="*,476">
+        <ScrollViewer Grid.Column="0" HorizontalScrollBarVisibility="Disabled">
+            <StackPanel x:Name="left" Margin="10,8,10,8">
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="MacPartsFinder" FontSize="32" FontWeight="Bold" />
+                    <TextBlock Text="™" FontSize="17" VerticalAlignment="Top" Margin="1,4,0,0" />
+                    <TextBlock Text="© 2026 Ian Johnston" FontSize="11" VerticalAlignment="Bottom" Margin="10,0,0,8" />
+                </StackPanel>
+
+                <TextBlock Classes="head" Text="Credits &amp; Acknowledgements:" Margin="0,6,0,0" />
+                <TextBlock Classes="body" Text="MacPartsFinder app by Ian Johnston - the Mac edition of WinPartsFinder.&#10;Part data from Mouser, DigiKey, element14 (Farnell / CPC / Newark) and TME web APIs.&#10;Supplier names and trademarks belong to their respective owners." />
+
+                <TextBlock Classes="head" Text="Development:" />
+                <TextBlock Classes="body" Text="Developed in C# with Avalonia UI, from the VB.NET WinPartsFinder, using Microsoft Visual Studio." />
+
+                <TextBlock Classes="head" Text="Supporting MacPartsFinder:" />
+                <TextBlock Classes="body" Text="If you find the program useful, please consider donating using the button provided.&#10;Your support helps me spend more time developing and extending MacPartsFinder, and also helps fund the purchase of faulty test equipment for repair on my YouTube channel." />
+
+                <TextBlock Classes="head" Text="Licence &amp; Usage:" />
+                <TextBlock Classes="body" Text="MacPartsFinder is provided free of charge for personal, non-commercial use only.&#10;The MacPartsFinder source code is made publicly available and may be used, modified and redistributed for non-commercial purposes only.&#10;Neither MacPartsFinder nor its source code, in whole or in part, may be used for commercial purposes without a separate commercial licence from the author. This includes use within businesses and organisations.&#10;Please contact the author (www.ianjohnston.com) to discuss commercial licensing arrangements.&#10;The MacPartsFinder and WinPartsFinder names and icons belong to the author. Modified or derived versions must not be called MacPartsFinder or WinPartsFinder, or use a name or icon likely to be confused with them, without the author's written permission.&#10;Each user must obtain their own supplier API keys and follow each supplier's API terms of use." />
+
+                <TextBlock Classes="head" Text="Disclaimer &amp; Limitation of Liability:" />
+                <TextBlock Classes="body" Text="MacPartsFinder and its source code are provided &quot;as is&quot;, without warranty of any kind, express or implied. Use of this software and source code is entirely at the user's own risk.&#10;Prices, stock levels and other part data come from third parties and may be out of date or wrong - always check with the supplier before ordering.&#10;To the fullest extent permitted by law, the author shall not be liable for any loss, damage, data loss, loss of use, loss of profits, or other direct, indirect, incidental or consequential loss arising from the installation, modification or use of, or inability to use, this software or source code." />
+            </StackPanel>
+        </ScrollViewer>
+
+        <!-- Right-hand side, laid out as in WinPartsFinder -->
+        <Canvas Grid.Column="1">
+            <TextBlock Canvas.Left="0" Canvas.Top="62" Text="Ian Johnston." FontSize="13" FontWeight="Bold" FontStyle="Italic" />
+            <HyperlinkButton Canvas.Left="0" Canvas.Top="86" Content="www.ianjohnston.com" Tag="https://www.ianjohnston.com"
+                             Click="Link_Click" ToolTip.Tip="Ian Johnston's website." />
+            <HyperlinkButton Canvas.Left="0" Canvas.Top="108" Content="www.youtube.com/user/IanScottJohnston"
+                             Tag="https://www.youtube.com/user/IanScottJohnston" Click="Link_Click"
+                             ToolTip.Tip="Ian's YouTube channel - test equipment repairs and more." />
+            <HyperlinkButton Canvas.Left="0" Canvas.Top="130" Content="www.twitter.com/IanSJohnston"
+                             Tag="https://www.twitter.com/IanSJohnston" Click="Link_Click" ToolTip.Tip="Ian on Twitter / X." />
+            <Image Canvas.Left="276" Canvas.Top="12" Width="150" Height="184" Stretch="Uniform"
+                   Source="avares://MacPartsFinder/Assets/AboutCartoon.png" />
+            <TextBlock Canvas.Left="246" Canvas.Top="202" Width="210" Text="SUPPORT MacPartsFinder" TextAlignment="Center"
+                       FontSize="16" FontWeight="Bold" Foreground="#DC1E1E" />
+            <Button Canvas.Left="286" Canvas.Top="236" Width="130" Height="56" Content="Donate via PayPal"
+                    HorizontalContentAlignment="Center" VerticalContentAlignment="Center" Click="BtnDonate_Click"
+                    ToolTip.Tip="Opens PayPal in your browser to make a donation towards MacPartsFinder." />
+            <Button Canvas.Left="371" Canvas.Top="628" Width="90" Height="28" Content="Close" IsCancel="True"
+                    HorizontalContentAlignment="Center" Click="BtnClose_Click" ToolTip.Tip="Close this window (Esc)." />
+        </Canvas>
+    </Grid>
+</Window>

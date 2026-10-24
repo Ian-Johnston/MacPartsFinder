@@ -66,6 +66,10 @@
     <DockPanel>
         <!-- Toolbar: same order as WinPartsFinder -->
         <DockPanel x:Name="toolbar" DockPanel.Dock="Top" Margin="6,4,6,2">
+            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="4" VerticalAlignment="Top" Margin="6,2,0,2">
+                <Button x:Name="btnHelp" Content="Help…" Click="BtnHelp_Click" ToolTip.Tip="How to use MacPartsFinder." />
+                <Button x:Name="btnAbout" Content="About…" Click="BtnAbout_Click" ToolTip.Tip="Version, credits, licence and donate." />
+            </StackPanel>
             <WrapPanel x:Name="toolbarLeft">
                 <TextBlock Text="Search:" />
                 <TextBox x:Name="txtSearch" Width="190"
@@ -76,20 +80,24 @@
                 <NumericUpDown x:Name="nudMax" Width="92" Minimum="1" Maximum="50" Increment="1" FormatString="0"
                                ToolTip.Tip="How many results to fetch from each supplier per search, and per Load more (up to 50).&#10;Fewer is faster. Each search or Load more uses one call of each supplier's daily API allowance." />
                 <Button x:Name="btnSearch" Content="Search" IsDefault="True" Click="BtnSearch_Click"
-                        ToolTip.Tip="Search every ticked supplier at once (Enter)." />
+                        ToolTip.Tip="Search every ticked supplier at once (Return)." />
+                <Button x:Name="btnAdvanced" Content="Advanced…" Click="BtnAdvanced_Click"
+                        ToolTip.Tip="Advanced search (⌘F): exact part number, supplier order code,&#10;RoHS, active parts, maker, quantity pricing, max price…" />
                 <Button x:Name="btnCancel" Content="Cancel" IsEnabled="False" Click="BtnCancel_Click"
                         ToolTip.Tip="Stop any searches still running." />
                 <Button x:Name="btnLoadMore" Content="Load more" IsEnabled="False" Click="BtnLoadMore_Click"
                         ToolTip.Tip="Fetch the next batch (Max/supp.) from every ticked supplier that has more - see Hits, e.g. 50 / 312.&#10;Uses one API call per supplier. New rows are added at the end and selected - click the Supplier header to group them.&#10;Right-click a supplier to load more from just that one." />
                 <CheckBox x:Name="chkInStock" Content="In stock only" IsCheckedChanged="ChkInStock_Changed"
                           ToolTip.Tip="Hide parts with no stock. Website-link rows always stay." />
+                <Button x:Name="btnTypes" Content="Types…" IsEnabled="False" Click="BtnTypes_Click"
+                        ToolTip.Tip="After a search: tick or untick part types (categories) to show or hide them,&#10;e.g. hide Evaluation Kit and Flip-Flops. A new search shows every type again." />
                 <TextBlock Text="Filter:" />
                 <TextBox x:Name="txtFilter" Width="120" PlaceholderText="narrow results…" TextChanged="TxtFilter_TextChanged"
                          ToolTip.Tip="Narrow the current results as you type.&#10;Matches supplier, supplier part no., mfr part no., manufacturer and description." />
                 <Button x:Name="btnExport" Content="Export CSV…" Click="BtnExport_Click"
                         ToolTip.Tip="Save the rows currently shown to a CSV file (opens in Excel or Numbers)." />
-                <Button x:Name="btnKeys" Content="API keys…" Click="BtnKeys_Click"
-                        ToolTip.Tip="Temporary, for testing: enter your own API keys. The full Settings window replaces this later." />
+                <Button x:Name="btnSettings" Content="Settings…" Click="BtnSettings_Click"
+                        ToolTip.Tip="API keys, supplier search URLs, your own suppliers, photos, dark mode and window layout." />
             </WrapPanel>
 
             <!-- Recent searches / suggestions, dropped down under the Search box (placed in code) -->
@@ -164,7 +172,8 @@
                         <DataGridTemplateColumn.CellTemplate>
                             <DataTemplate x:DataType="local:ResultRow">
                                 <Border Width="35" Height="35" Background="White" BorderBrush="Silver" BorderThickness="1"
-                                        HorizontalAlignment="Center" VerticalAlignment="Center">
+                                        HorizontalAlignment="Center" VerticalAlignment="Center"
+                                        Classes="thumb" Cursor="Hand" Tapped="Thumb_Tapped" ToolTip.Tip="Click for a bigger photo">
                                     <Panel>
                                         <Image Source="{Binding Thumb}" Margin="1" Stretch="Uniform" />
                                         <Path IsVisible="{Binding NoPhoto}" Data="M 8,8 L 25,25 M 25,8 L 8,25"
