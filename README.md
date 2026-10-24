@@ -15,6 +15,9 @@ Get the latest `.dmg` from the **Releases** page:
 
 Open the `.dmg` and drag **MacPartsFinder** into **Applications**.
 
+Needs **macOS 15 (Sequoia) or later** - the oldest macOS that .NET 10 supports. Every Apple Silicon Mac can update
+to it for free (System Settings > General > Software Update); some older Intel Macs can't.
+
 ## First launch
 
 MacPartsFinder isn't signed by Apple yet, so the first time you open it macOS says it can't check it for malicious

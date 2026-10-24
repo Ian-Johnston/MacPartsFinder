@@ -80,5 +80,7 @@ jobs:
             - **MacPartsFinder-mac-arm64.dmg** - Apple Silicon Macs (M1 and later)
             - **MacPartsFinder-mac-intel.dmg** - older Intel Macs
 
+            Needs macOS 15 (Sequoia) or later.
+
             Not signed by Apple yet, so the first time you open it, macOS will block it.
             Go to **System Settings > Privacy & Security** and click **Open Anyway** - see the README for details.
