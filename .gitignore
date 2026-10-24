@@ -366,3 +366,6 @@ FodyWeavers.xsd
 
 # Personal API keys - never publish these (any file with MyKeys in its name, anywhere in the project)
 *MyKeys*
+
+# My own release notes (kept on this PC only)
+/Release.txt
