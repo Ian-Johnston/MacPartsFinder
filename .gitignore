@@ -363,3 +363,6 @@ MigrationBackup/
 FodyWeavers.xsd
 # Downloaded .dmg/.zip test builds - kept on this PC only, never committed
 /Test Builds/
+
+# Personal API keys - never publish these (any file with MyKeys in its name, anywhere in the project)
+*MyKeys*
