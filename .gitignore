@@ -361,3 +361,5 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+# Downloaded .dmg/.zip test builds - kept on this PC only, never committed
+/Test Builds/
