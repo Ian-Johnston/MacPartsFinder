@@ -132,6 +132,27 @@ echo  DONE. %VER% is on its way:
 echo    - The Mac build is running now (about 1-2 minutes) - opening GitHub Actions to watch it.
 echo    - Then the downloads appear at %REPO_URL%/releases/tag/%VER%
 start "" "%REPO_URL%/actions"
+
+rem ---- The direct download links, for forums etc. (replaced each release) ----
+set "LINKS=%~dp0download links.txt"
+set "DL=%REPO_URL%/releases/download/%VER%"
+> "%LINKS%" echo MacPartsFinder %VER% - download links (written by Release.bat, %DATE% %TIME:~0,5%)
+>>"%LINKS%" echo.
+>>"%LINKS%" echo Apple Silicon Macs (M1 and later):
+>>"%LINKS%" echo %DL%/MacPartsFinder-mac-arm64.dmg
+>>"%LINKS%" echo.
+>>"%LINKS%" echo Intel Macs:
+>>"%LINKS%" echo %DL%/MacPartsFinder-mac-intel.dmg
+>>"%LINKS%" echo.
+>>"%LINKS%" echo Release page:
+>>"%LINKS%" echo %REPO_URL%/releases/tag/%VER%
+>>"%LINKS%" echo.
+>>"%LINKS%" echo The links work once the GitHub build has finished (a few minutes), and for other people only once the repo is public.
+if errorlevel 1 (
+    echo    - Couldn't write "download links.txt" - the links are the ones above.
+) else (
+    echo    - The download links are saved in "download links.txt" in this folder.
+)
 goto end
 
 :fail

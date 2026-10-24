@@ -369,3 +369,6 @@ FodyWeavers.xsd
 
 # My own release notes (kept on this PC only)
 /Release.txt
+
+# Written by Release.bat after each release (kept on this PC only)
+/download links.txt
