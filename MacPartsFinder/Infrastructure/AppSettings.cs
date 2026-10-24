@@ -1,12 +1,14 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using Newtonsoft.Json;
 
 namespace MacPartsFinder;
 
 /// <summary>
-/// User settings. Loading, saving and the API key store (macOS Keychain) come in the next step;
-/// for now this holds the values the suppliers are built from.
+/// User settings, stored as JSON in ~/Library/Application Support/MacPartsFinder/settings.json on a Mac
+/// (%AppData%\MacPartsFinder\settings.json on Windows - separate from WinPartsFinder's settings).
+/// API keys/secrets are not in that file: they go in the secret store (macOS Keychain / Windows DPAPI).
 /// </summary>
 public class AppSettings
 {
@@ -39,13 +41,27 @@ public class AppSettings
         { AliExpress, "https://www.aliexpress.com/wholesale?SearchText={0}" }
     };
 
-    // ---- Secrets (in memory only - never written to the settings file) ----
+    // ---- Secrets (never written to the settings file - see SecretFields) ----
     [JsonIgnore] public string MouserApiKey { get; set; } = "";
     [JsonIgnore] public string DigiKeyClientId { get; set; } = "";
     [JsonIgnore] public string DigiKeyClientSecret { get; set; } = "";
     [JsonIgnore] public string Element14ApiKey { get; set; } = "";
     [JsonIgnore] public string TmeToken { get; set; } = "";
     [JsonIgnore] public string TmeSecret { get; set; } = "";
+
+    /// <summary>Each secret's name in the store, and how to read/write it here.</summary>
+    private static readonly (string Name, Func<AppSettings, string> Get, Action<AppSettings, string> Set)[] SecretFields =
+    {
+        (nameof(MouserApiKey), s => s.MouserApiKey, (s, v) => s.MouserApiKey = v),
+        (nameof(DigiKeyClientId), s => s.DigiKeyClientId, (s, v) => s.DigiKeyClientId = v),
+        (nameof(DigiKeyClientSecret), s => s.DigiKeyClientSecret, (s, v) => s.DigiKeyClientSecret = v),
+        (nameof(Element14ApiKey), s => s.Element14ApiKey, (s, v) => s.Element14ApiKey = v),
+        (nameof(TmeToken), s => s.TmeToken, (s, v) => s.TmeToken = v),
+        (nameof(TmeSecret), s => s.TmeSecret, (s, v) => s.TmeSecret = v)
+    };
+
+    /// <summary>Secrets as last loaded/saved, so Save only touches the store when a key changed.</summary>
+    private readonly Dictionary<string, string> _storedSecrets = new();
 
     // ---- DigiKey locale ----
     public string DigiKeySite { get; set; } = "UK";
@@ -73,6 +89,62 @@ public class AppSettings
     /// <summary>The Advanced search window reopens with these - while the app is open only (not saved),
     /// so every run starts with a plain Advanced search.</summary>
     [JsonIgnore] public AdvancedSearchOptions LastAdvanced { get; set; } = new();
+
+    /// <summary>Set by Load when the settings file couldn't be read (defaults used); "" if all was well.
+    /// The main window shows it - there's no window yet while loading.</summary>
+    [JsonIgnore] public string LoadError { get; private set; } = "";
+
+    public static string Folder { get; } =
+        OperatingSystem.IsMacOS()
+            ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Library", "Application Support", "MacPartsFinder")
+            : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "MacPartsFinder");
+
+    public static string FilePath { get; } = Path.Combine(Folder, "settings.json");
+
+    private static ISecretStore? _secretStore;
+    private static ISecretStore Secrets => _secretStore ??= SecretStore.ForThisPlatform(Folder);
+
+    public static AppSettings Load()
+    {
+        AppSettings? s = null;
+        var error = "";
+        try
+        {
+            if (File.Exists(FilePath))
+            {
+                // Replace (not add to) the default empty lists/dictionaries when reading.
+                s = JsonConvert.DeserializeObject<AppSettings>(File.ReadAllText(FilePath),
+                        new JsonSerializerSettings { ObjectCreationHandling = ObjectCreationHandling.Replace });
+            }
+        }
+        catch (Exception ex)
+        {
+            error = "Could not read settings, defaults will be used." + Environment.NewLine + ex.Message;
+        }
+        s ??= new AppSettings();
+        s.LoadError = error;
+        foreach (var f in SecretFields)
+        {
+            var value = Secrets.Get(f.Name);
+            f.Set(s, value);
+            s._storedSecrets[f.Name] = value;
+        }
+        return s;
+    }
+
+    /// <summary>Writes settings.json, then any keys that changed to the secret store. Throws if either fails.</summary>
+    public void Save()
+    {
+        Directory.CreateDirectory(Folder);
+        File.WriteAllText(FilePath, JsonConvert.SerializeObject(this, Formatting.Indented));
+        foreach (var f in SecretFields)
+        {
+            var value = f.Get(this);
+            if (_storedSecrets.TryGetValue(f.Name, out var stored) && stored == value) continue;
+            Secrets.Set(f.Name, value);
+            _storedSecrets[f.Name] = value;
+        }
+    }
 
     public string GetSearchUrl(string supplierName)
     {
