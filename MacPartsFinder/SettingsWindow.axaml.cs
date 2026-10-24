@@ -11,10 +11,24 @@ using Avalonia.Styling;
 namespace MacPartsFinder;
 
 /// <summary>One line of the search-URL list in Settings.</summary>
-public sealed class UrlRow
+public sealed class UrlRow : System.ComponentModel.INotifyPropertyChanged
 {
+    public event System.ComponentModel.PropertyChangedEventHandler? PropertyChanged;
+
     public string Name { get; set; } = "";
-    public string Url { get; set; } = "";
+
+    private string _url = "";
+    /// <summary>(Notifies the grid, as changing the Farnell store can change Farnell's URL.)</summary>
+    public string Url
+    {
+        get => _url;
+        set
+        {
+            _url = value;
+            PropertyChanged?.Invoke(this, new System.ComponentModel.PropertyChangedEventArgs(nameof(Url)));
+        }
+    }
+
     /// <summary>Built-in suppliers can be edited but not renamed or deleted.</summary>
     public bool IsCustom { get; init; }
 }
@@ -37,8 +51,11 @@ public partial class SettingsWindow : Window
     {
         InitializeComponent();
         _settings = settings;
-        cboDkSite.ItemsSource = new[] { "UK", "US", "IE", "DE", "FR", "NL", "CA", "AU" };
-        cboDkCurrency.ItemsSource = new[] { "GBP", "EUR", "USD", "CAD", "AUD" };
+        cboDkSite.ItemsSource = DigiKeySupplier.Sites;
+        cboDkCurrency.ItemsSource = DigiKeySupplier.Currencies;
+        cboFarnellStore.ItemsSource = Element14Supplier.FarnellStores;
+        cboTmeCountry.ItemsSource = TmeSupplier.Countries;
+        cboTmeCurrency.ItemsSource = TmeSupplier.Currencies;
 
         txtMouserKey.Text = settings.MouserApiKey;
         txtDkClientId.Text = settings.DigiKeyClientId;
@@ -46,8 +63,11 @@ public partial class SettingsWindow : Window
         cboDkSite.Text = settings.DigiKeySite;
         cboDkCurrency.Text = settings.DigiKeyCurrency;
         txtE14Key.Text = settings.Element14ApiKey;
+        cboFarnellStore.SelectedItem = Element14Supplier.FindFarnellStore(settings.FarnellStore);
         txtTmeToken.Text = settings.TmeToken;
         txtTmeSecret.Text = settings.TmeSecret;
+        cboTmeCountry.Text = settings.TmeCountry;
+        cboTmeCurrency.Text = settings.TmeCurrency;
         chkShowThumbnails.IsChecked = settings.ShowThumbnails;
         chkDarkMode.IsChecked = settings.DarkMode;
         gridUrls.ItemsSource = _urls;
@@ -166,8 +186,13 @@ public partial class SettingsWindow : Window
         _settings.DigiKeySite = (cboDkSite.Text ?? "").Trim().ToUpperInvariant();
         _settings.DigiKeyCurrency = (cboDkCurrency.Text ?? "").Trim().ToUpperInvariant();
         _settings.Element14ApiKey = (txtE14Key.Text ?? "").Trim();
+        _settings.FarnellStore = SelectedFarnellStore();
         _settings.TmeToken = (txtTmeToken.Text ?? "").Trim();
         _settings.TmeSecret = (txtTmeSecret.Text ?? "").Trim();
+        var tmeCountry = (cboTmeCountry.Text ?? "").Trim();
+        if (tmeCountry.Length > 0) _settings.TmeCountry = tmeCountry.ToUpperInvariant();
+        var tmeCurrency = (cboTmeCurrency.Text ?? "").Trim();
+        if (tmeCurrency.Length > 0) _settings.TmeCurrency = tmeCurrency.ToUpperInvariant();
         _settings.ShowThumbnails = chkShowThumbnails.IsChecked == true;
         _settings.DarkMode = chkDarkMode.IsChecked == true;
 
@@ -176,7 +201,7 @@ public partial class SettingsWindow : Window
         {
             var url = (row.Url ?? "").Trim();
             // Only store overrides, so future default changes still apply.
-            if (url.Length > 0 && url != AppSettings.DefaultSearchUrls[row.Name]) _settings.SearchUrls[row.Name] = url;
+            if (url.Length > 0 && url != AppSettings.DefaultSearchUrl(row.Name, _settings.FarnellStore)) _settings.SearchUrls[row.Name] = url;
         }
         _settings.CustomSuppliers = CurrentCustoms();
 
@@ -193,7 +218,29 @@ public partial class SettingsWindow : Window
     {
         // Resets the built-in URLs only; your own suppliers are kept.
         gridUrls.CommitEdit();
-        LoadUrls(name => AppSettings.DefaultSearchUrls[name], CurrentCustoms());
+        LoadUrls(name => AppSettings.DefaultSearchUrl(name, SelectedFarnellStore()), CurrentCustoms());
+    }
+
+    private string SelectedFarnellStore()
+    {
+        return cboFarnellStore.SelectedItem is Element14Supplier.Store st ? st.Id : _settings.FarnellStore;
+    }
+
+    // Changing the Farnell store also moves Farnell's website link to that store - unless you'd set your own link.
+    private string? _shownFarnellStore;
+
+    private void CboFarnellStore_SelectionChanged(object? sender, SelectionChangedEventArgs e)
+    {
+        var newStore = SelectedFarnellStore();
+        if (_shownFarnellStore != null && newStore != _shownFarnellStore)
+        {
+            foreach (var row in _urls.Where(r => r.Name == AppSettings.Farnell && !r.IsCustom))
+            {
+                if ((row.Url ?? "").Trim() == AppSettings.DefaultSearchUrl(AppSettings.Farnell, _shownFarnellStore))
+                    row.Url = AppSettings.DefaultSearchUrl(AppSettings.Farnell, newStore);
+            }
+        }
+        _shownFarnellStore = newStore;
     }
 
     private void BtnResetWindow_Click(object? sender, RoutedEventArgs e)

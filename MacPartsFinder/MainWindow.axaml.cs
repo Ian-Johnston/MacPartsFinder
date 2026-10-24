@@ -25,8 +25,9 @@ namespace MacPartsFinder;
 
 public partial class MainWindow : Window
 {
-    // ==== THE version number - change it here for each release ====
-    public const string AppVersion = "V0.1";
+    // ==== THE version number - change it here for each release (to match the vX.Y.Z tag Release.bat makes) ====
+    public const string AppVersion = "V0.1.2";
+    private const string TitleSuffix = "(Free for Non-Commercial Use • Support MacPartsFinder - see About)";
 
     private AppSettings _settings;
     private List<Supplier> _suppliers = new();
@@ -56,7 +57,7 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
         _settings = AppSettings.Load();
-        Title = $"MacPartsFinder - {AppVersion}  (test build)";
+        Title = $"MacPartsFinder - {AppVersion}      {TitleSuffix}";
         if (Application.Current != null)
             Application.Current.RequestedThemeVariant = _settings.DarkMode ? ThemeVariant.Dark : ThemeVariant.Light;
 
@@ -73,6 +74,11 @@ public partial class MainWindow : Window
         gridResults.ItemsSource = _view;
         gridSuppliers.ItemsSource = _supplierRows;
 
+        // Row lines under the real columns only (see the "gl" style) - not on across the empty space to the right.
+        foreach (var col in gridResults.Columns)
+        {
+            col.CellStyleClasses.Add("gl");
+        }
         AddColumnHeaderTips();
         _defaultColumns = CurrentColumnLayout();
         ApplyColumnLayout(_settings.ResultColumns);
@@ -598,6 +604,8 @@ public partial class MainWindow : Window
         {
             r.No = _nextRowNo++;
         }
+        // Re-apply the column sort: if the list is sorted by #, the new numbers have to be put in order too.
+        _view.Refresh();
     }
 
     private const int SeqPerSupplier = 100000;
@@ -1058,7 +1066,7 @@ public partial class MainWindow : Window
         {
             added.Add(AddResult(s.MakeLinkResult(query), SeqFor(s, 0)));
             item.Status = "Link added";
-            UpdateCountStatus();
+            ApplyFilter(); // (also re-applies the column sort)
             return;
         }
         var st = new PagingState { Query = query, Mode = mode, Filters = filters };
@@ -1162,7 +1170,9 @@ public partial class MainWindow : Window
         }
         item.Hits = HitsText(s, st);
         item.Time = $"{sw.Elapsed.TotalSeconds:0.0}s";
-        UpdateCountStatus();
+        // Re-apply the column the user sorted by (e.g. Price) to everything that's arrived so far, so the list
+        // always matches the header's sort arrow - a new search keeps the sort, as in WinPartsFinder.
+        ApplyFilter();
         UpdateLoadMoreButton();
     }
 

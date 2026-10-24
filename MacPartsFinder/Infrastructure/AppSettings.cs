@@ -68,6 +68,9 @@ public class AppSettings
     public string DigiKeyLanguage { get; set; } = "en";
     public string DigiKeyCurrency { get; set; } = "GBP";
 
+    // ---- Farnell country store (element14), e.g. "nz.element14.com" - the same key works for all of them ----
+    public string FarnellStore { get; set; } = "uk.farnell.com";
+
     // ---- TME locale (country decides stock/prices offered; currency of the prices) ----
     public string TmeCountry { get; set; } = "GB";
     public string TmeCurrency { get; set; } = "GBP";
@@ -149,8 +152,14 @@ public class AppSettings
     public string GetSearchUrl(string supplierName)
     {
         if (SearchUrls.TryGetValue(supplierName, out var url) && !string.IsNullOrWhiteSpace(url)) return url;
-        if (DefaultSearchUrls.TryGetValue(supplierName, out url)) return url;
-        return "";
+        return DefaultSearchUrl(supplierName, FarnellStore);
+    }
+
+    /// <summary>The built-in website search URL. Farnell's follows the country store chosen in Settings.</summary>
+    public static string DefaultSearchUrl(string supplierName, string? farnellStore)
+    {
+        if (supplierName == Farnell) return $"https://{Element14Supplier.FindFarnellStore(farnellStore).Id}/search?st={{0}}";
+        return DefaultSearchUrls.TryGetValue(supplierName, out var url) ? url : "";
     }
 
     public bool IsEnabled(string supplierName)

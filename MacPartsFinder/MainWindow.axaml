@@ -55,6 +55,27 @@
             <Setter Property="Foreground" Value="{Binding $parent[DataGridCell].Foreground}" />
         </Style>
 
+        <!-- Thin frame round the supplier list and the results -->
+        <Style Selector="Border.frame">
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="BorderBrush" Value="{DynamicResource SystemControlForegroundBaseMediumLowBrush}" />
+        </Style>
+
+        <!-- Results row lines: drawn under each real column's cells (class "gl", added in code), so they stop at the
+             last column like WinPartsFinder's - the grid's own row line runs on across the empty space to the right. -->
+        <Style Selector="DataGrid#gridResults DataGridCell.gl">
+            <Setter Property="BorderThickness" Value="0,0,0,1" />
+            <Setter Property="BorderBrush" Value="{Binding $parent[DataGrid].HorizontalGridLinesBrush}" />
+        </Style>
+        <!-- Same for the line under the headers: the grid's own runs the full width, so it's swapped for one under each
+             real header (the blank filler header to the right of the last column is :disabled, so it gets none). -->
+        <Style Selector="DataGrid#gridResults /template/ Rectangle#PART_ColumnHeadersAndRowsSeparator">
+            <Setter Property="IsVisible" Value="False" />
+        </Style>
+        <Style Selector="DataGrid#gridResults DataGridColumnHeader:not(:disabled) /template/ Rectangle#HeaderLine">
+            <Setter Property="IsVisible" Value="True" />
+        </Style>
+
         <!-- Suggestions while typing: never take the keyboard from the Search box -->
         <Style Selector="ListBox#lstSuggest ListBoxItem">
             <Setter Property="Focusable" Value="False" />
@@ -109,15 +130,19 @@
             </Popup>
         </DockPanel>
 
-        <!-- Status bar -->
-        <DockPanel DockPanel.Dock="Bottom" Margin="8,3,8,4">
-            <TextBlock x:Name="lblTotal" DockPanel.Dock="Right" Text="Total parts = 0" Margin="12,0,0,0" />
-            <TextBlock x:Name="lblStatus" Text="Ready" TextTrimming="CharacterEllipsis" />
-        </DockPanel>
+        <!-- Status bar, with a thin line above it -->
+        <Border DockPanel.Dock="Bottom" BorderThickness="0,1,0,0" BorderBrush="{DynamicResource SystemControlForegroundBaseMediumLowBrush}">
+            <DockPanel Margin="8,3,8,4">
+                <TextBlock x:Name="lblTotal" DockPanel.Dock="Right" Text="Total parts = 0" Margin="12,0,0,0" />
+                <TextBlock x:Name="lblStatus" Text="Ready" TextTrimming="CharacterEllipsis" />
+            </DockPanel>
+        </Border>
 
+        <!-- Supplier list and results, each in its own frame with the divider between (as in WinPartsFinder) -->
         <Grid x:Name="gridMain" ColumnDefinitions="440,5,*">
             <!-- Supplier list -->
-            <DataGrid x:Name="gridSuppliers" Grid.Column="0" IsReadOnly="True" CanUserSortColumns="False"
+            <Border Grid.Column="0" Classes="frame">
+            <DataGrid x:Name="gridSuppliers" IsReadOnly="True" CanUserSortColumns="False"
                       SelectionMode="Single" HeadersVisibility="Column" GridLinesVisibility="Horizontal" RowHeight="24"
                       LoadingRow="GridSuppliers_LoadingRow" DoubleTapped="GridSuppliers_DoubleTapped">
                 <DataGrid.ContextMenu>
@@ -129,7 +154,8 @@
                     </ContextMenu>
                 </DataGrid.ContextMenu>
                 <DataGrid.Columns>
-                    <DataGridTemplateColumn Header="Supplier" Width="130">
+                    <!-- Widths fit the Mac's slightly wider font: "Link added", "50 / 312" and "6.7s" all show in full -->
+                    <DataGridTemplateColumn Header="Supplier" Width="124">
                         <DataGridTemplateColumn.CellTemplate>
                             <DataTemplate x:DataType="local:SupplierRow">
                                 <CheckBox IsChecked="{Binding IsChecked}" Margin="6,0,0,0">
@@ -138,19 +164,21 @@
                             </DataTemplate>
                         </DataGridTemplateColumn.CellTemplate>
                     </DataGridTemplateColumn>
-                    <DataGridTextColumn Header="Mode" Binding="{Binding ModeText}" x:DataType="local:SupplierRow" Width="98" />
-                    <DataGridTextColumn Header="Status" Binding="{Binding Status}" x:DataType="local:SupplierRow" Width="76" />
-                    <DataGridTextColumn Header="Hits" Binding="{Binding Hits}" x:DataType="local:SupplierRow" Width="60" CellStyleClasses="right" />
+                    <DataGridTextColumn Header="Mode" Binding="{Binding ModeText}" x:DataType="local:SupplierRow" Width="96" />
+                    <DataGridTextColumn Header="Status" Binding="{Binding Status}" x:DataType="local:SupplierRow" Width="88" />
+                    <DataGridTextColumn Header="Hits" Binding="{Binding Hits}" x:DataType="local:SupplierRow" Width="74" CellStyleClasses="right" />
                     <DataGridTextColumn Header="Time" Binding="{Binding Time}" x:DataType="local:SupplierRow" Width="*" />
                 </DataGrid.Columns>
             </DataGrid>
+            </Border>
 
-            <GridSplitter Grid.Column="1" ResizeDirection="Columns" />
+            <GridSplitter Grid.Column="1" ResizeDirection="Columns" Background="Transparent" />
 
             <!-- Results -->
-            <DataGrid x:Name="gridResults" Grid.Column="2" IsReadOnly="True" SelectionMode="Extended"
+            <Border Grid.Column="2" Classes="frame">
+            <DataGrid x:Name="gridResults" IsReadOnly="True" SelectionMode="Extended"
                       CanUserReorderColumns="True" CanUserResizeColumns="True" CanUserSortColumns="True"
-                      FrozenColumnCount="1" HeadersVisibility="Column" GridLinesVisibility="All"
+                      FrozenColumnCount="1" HeadersVisibility="Column" GridLinesVisibility="Vertical"
                       LoadingRow="GridResults_LoadingRow" DoubleTapped="GridResults_DoubleTapped" KeyDown="GridResults_KeyDown">
                 <DataGrid.ContextMenu>
                     <ContextMenu x:Name="cmsResults" Opening="CmsResults_Opening">
@@ -201,7 +229,8 @@
                                         Width="55" CellStyleClasses="right stock" />
                     <DataGridTextColumn Tag="UnitPrice" Header="Price (1)" Binding="{Binding UnitPrice, StringFormat='{}{0:#,##0.00##}'}"
                                         x:DataType="local:ResultRow" Width="64" CellStyleClasses="right" />
-                    <DataGridTextColumn Tag="Currency" Header="Cur" Binding="{Binding Currency}" x:DataType="local:ResultRow" Width="42" />
+                    <!-- MinWidth also widens a narrower width saved by an earlier version, so GBP etc. show in full -->
+                    <DataGridTextColumn Tag="Currency" Header="Cur" Binding="{Binding Currency}" x:DataType="local:ResultRow" Width="52" MinWidth="50" />
                     <DataGridTextColumn Tag="PriceBreaks" Header="Price breaks" Binding="{Binding PriceBreaks}" x:DataType="local:ResultRow" Width="220" />
                     <DataGridTextColumn Tag="MOQ" Header="MOQ" Binding="{Binding Moq}" x:DataType="local:ResultRow" Width="48" CellStyleClasses="right" />
                     <DataGridTextColumn Tag="Availability" Header="Availability / lead" Binding="{Binding Availability}" x:DataType="local:ResultRow" Width="110" />
@@ -216,6 +245,7 @@
                     <DataGridTextColumn Tag="Status" Header="Status" Binding="{Binding Status}" x:DataType="local:ResultRow" Width="60" />
                 </DataGrid.Columns>
             </DataGrid>
+            </Border>
         </Grid>
     </DockPanel>
 </Window>

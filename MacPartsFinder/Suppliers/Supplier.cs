@@ -111,11 +111,12 @@ public static class SupplierFactory
 {
     public static List<Supplier> Create(AppSettings s)
     {
+        var farnellStore = Element14Supplier.FindFarnellStore(s.FarnellStore); // the country chosen in Settings
         var all = new Dictionary<string, Supplier>
         {
             { AppSettings.RS, new WebLinkSupplier(AppSettings.RS, s.GetSearchUrl(AppSettings.RS)) },
-            { AppSettings.Farnell, new Element14Supplier(AppSettings.Farnell, "uk.farnell.com", "GBP",
-                                                         s.Element14ApiKey, s.GetSearchUrl(AppSettings.Farnell)) },
+            { AppSettings.Farnell, new Element14Supplier(AppSettings.Farnell, farnellStore.Id, farnellStore.Currency,
+                                                         s.Element14ApiKey, s.GetSearchUrl(AppSettings.Farnell), farnellStore.ImageLocale) },
             { AppSettings.CPC, new Element14Supplier(AppSettings.CPC, "cpc.farnell.com", "GBP",
                                                      s.Element14ApiKey, s.GetSearchUrl(AppSettings.CPC)) },
             { AppSettings.DigiKey, new DigiKeySupplier(s.DigiKeyClientId, s.DigiKeyClientSecret, s.DigiKeySite,

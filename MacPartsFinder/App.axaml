@@ -60,6 +60,9 @@
                         </Grid>
                         <Rectangle Width="1" HorizontalAlignment="Right" Fill="{TemplateBinding SeparatorBrush}"
                                    IsVisible="{TemplateBinding AreSeparatorsVisible}" />
+                        <!-- A line under this header only - off unless a grid turns it on (the results grid does) -->
+                        <Rectangle Name="HeaderLine" Height="1" VerticalAlignment="Bottom" IsVisible="False"
+                                   Fill="{TemplateBinding SeparatorBrush}" />
                     </Panel>
                 </ControlTemplate>
             </Setter>

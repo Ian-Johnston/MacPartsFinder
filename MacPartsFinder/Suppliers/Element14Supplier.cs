@@ -25,15 +25,88 @@ public class Element14Supplier : ApiSupplier
     private static DateTime _lastCallUtc = DateTime.MinValue;
     private static readonly TimeSpan MinCallSpacing = TimeSpan.FromMilliseconds(600);
 
+    /// <summary>One element14 country store: same API key, its own stock and prices.</summary>
+    public sealed class Store
+    {
+        public Store(string id, string country, string currency, string imageLocale = "en_GB")
+        {
+            Id = id;
+            Country = country;
+            Currency = currency;
+            ImageLocale = imageLocale;
+        }
+
+        public string Id { get; }          // e.g. "nz.element14.com"
+        public string Country { get; }
+        public string Currency { get; }    // the API doesn't say, so it's listed here (checked against live prices)
+        public string ImageLocale { get; } // photo folder: en_GB on most stores, en_US on AU/NZ
+
+        public override string ToString() => $"{Country} - {Id} ({Currency})";
+    }
+
+    /// <summary>The stores the Farnell supplier can use - each one tested live with a search and a photo (Oct 2026).</summary>
+    public static readonly List<Store> FarnellStores = new()
+    {
+        new Store("uk.farnell.com", "United Kingdom", "GBP"),
+        new Store("ie.farnell.com", "Ireland", "EUR"),
+        new Store("de.farnell.com", "Germany", "EUR"),
+        new Store("fr.farnell.com", "France", "EUR"),
+        new Store("it.farnell.com", "Italy", "EUR"),
+        new Store("es.farnell.com", "Spain", "EUR"),
+        new Store("nl.farnell.com", "Netherlands", "EUR"),
+        new Store("be.farnell.com", "Belgium", "EUR"),
+        new Store("at.farnell.com", "Austria", "EUR"),
+        new Store("pt.farnell.com", "Portugal", "EUR"),
+        new Store("fi.farnell.com", "Finland", "EUR"),
+        new Store("sk.farnell.com", "Slovakia", "EUR"),
+        new Store("si.farnell.com", "Slovenia", "EUR"),
+        new Store("ee.farnell.com", "Estonia", "EUR"),
+        new Store("lv.farnell.com", "Latvia", "EUR"),
+        new Store("lt.farnell.com", "Lithuania", "EUR"),
+        new Store("bg.farnell.com", "Bulgaria", "EUR"),
+        new Store("ch.farnell.com", "Switzerland", "CHF"),
+        new Store("se.farnell.com", "Sweden", "SEK"),
+        new Store("dk.farnell.com", "Denmark", "DKK"),
+        new Store("no.farnell.com", "Norway", "NOK"),
+        new Store("pl.farnell.com", "Poland", "PLN"),
+        new Store("cz.farnell.com", "Czech Republic", "CZK"),
+        new Store("hu.farnell.com", "Hungary", "HUF"),
+        new Store("ro.farnell.com", "Romania", "RON"),
+        new Store("il.farnell.com", "Israel", "USD"),
+        new Store("tr.farnell.com", "Turkey", "EUR"),
+        new Store("export.farnell.com", "Export (other countries)", "GBP"),
+        new Store("au.element14.com", "Australia", "AUD", "en_US"),
+        new Store("nz.element14.com", "New Zealand", "NZD", "en_US"),
+        new Store("sg.element14.com", "Singapore", "SGD"),
+        new Store("my.element14.com", "Malaysia", "MYR"),
+        new Store("in.element14.com", "India", "INR"),
+        new Store("cn.element14.com", "China", "CNY"),
+        new Store("hk.element14.com", "Hong Kong", "HKD"),
+        new Store("tw.element14.com", "Taiwan", "TWD"),
+        new Store("kr.element14.com", "South Korea", "KRW"),
+        new Store("th.element14.com", "Thailand", "THB"),
+        new Store("ph.element14.com", "Philippines", "PHP"),
+        new Store("vn.element14.com", "Vietnam", "USD")
+    };
+
+    /// <summary>The store with this id, or the UK one if it isn't known.</summary>
+    public static Store FindFarnellStore(string? id)
+    {
+        return FarnellStores.FirstOrDefault(s => string.Equals(s.Id, id, StringComparison.OrdinalIgnoreCase)) ?? FarnellStores[0];
+    }
+
     private readonly string _storeId;
     private readonly string _currency;
+    private readonly string _imageLocale;
     private readonly string _apiKey;
 
-    public Element14Supplier(string name, string storeId, string currency, string? apiKey, string searchUrlTemplate)
+    public Element14Supplier(string name, string storeId, string currency, string? apiKey, string searchUrlTemplate,
+                             string imageLocale = "en_GB")
         : base(name, searchUrlTemplate)
     {
         _storeId = storeId;
         _currency = currency;
+        _imageLocale = imageLocale;
         _apiKey = (apiKey ?? "").Trim();
     }
 
@@ -151,13 +224,13 @@ public class Element14Supplier : ApiSupplier
             var ds = p.GetArr("datasheets").FirstOrDefault();
             r.DatasheetUrl = ds.GetStr("url");
 
-            // Only the file name comes back, e.g. "/GE8SOIC-40.jpg". Both stores serve
-            // it from the en_GB path (en_US 404s, even on Newark).
+            // Only the file name comes back, e.g. "/GE8SOIC-40.jpg". Most stores (Newark too) serve it from
+            // the en_GB folder; Australia and New Zealand only from en_US.
             var imageFile = p.GetStr("image", "baseName");
             if (imageFile.Length > 0)
             {
-                r.ImageUrl = $"https://{_storeId}/productimages/standard/en_GB{imageFile}";
-                r.LargeImageUrl = $"https://{_storeId}/productimages/large/en_GB{imageFile}";
+                r.ImageUrl = $"https://{_storeId}/productimages/standard/{_imageLocale}{imageFile}";
+                r.LargeImageUrl = $"https://{_storeId}/productimages/large/{_imageLocale}{imageFile}";
             }
             results.Add(r);
         }

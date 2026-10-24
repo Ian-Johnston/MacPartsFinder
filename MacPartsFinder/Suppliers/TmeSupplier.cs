@@ -21,6 +21,19 @@ namespace MacPartsFinder;
 /// </summary>
 public class TmeSupplier : ApiSupplier
 {
+    /// <summary>
+    /// Countries for Settings (TME prices and stock for that country). TME ships to many more - any two-letter
+    /// country code can be typed in. Only GB / GBP has been tested live; the rest follow TME's documentation.
+    /// </summary>
+    public static readonly string[] Countries =
+    {
+        "GB", "IE", "PL", "DE", "FR", "IT", "ES", "NL", "BE", "AT", "PT", "FI", "SE", "DK", "NO", "CZ", "SK",
+        "HU", "RO", "BG", "LT", "LV", "EE", "SI", "HR", "GR", "CH", "US", "CA", "AU", "NZ"
+    };
+
+    /// <summary>Currencies for Settings. TME's own currencies are PLN, EUR and USD; GBP also works.</summary>
+    public static readonly string[] Currencies = { "GBP", "EUR", "USD", "PLN" };
+
     private const string BaseUrl = "https://api.tme.eu";
     private const int MaxPerPage = 50; // /products/data takes up to 50 symbols
 
