@@ -1,0 +1,84 @@
+# Builds the Mac downloads on GitHub's own Macs.
+#  - Push a version tag (e.g. v0.1.0) and both .dmg files are attached to a pre-release on the Releases page.
+#  - Or Actions > Mac release > Run workflow for a test build: the .dmg files are then under that run's "Artifacts".
+# Not Apple-signed (no Developer account): each app gets a free ad-hoc signature, which Apple Silicon Macs need
+# to run it at all. First launch then needs System Settings > Privacy & Security > Open Anyway - see README.md.
+name: Mac release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: macos-latest
+    strategy:
+      matrix:
+        include:
+          - rid: osx-arm64
+            label: arm64   # Apple Silicon (M1 and later)
+          - rid: osx-x64
+            label: intel
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Version
+        id: version
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+          else
+            echo "version=0.0.${GITHUB_RUN_NUMBER}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Publish
+        run: >
+          dotnet publish MacPartsFinder/MacPartsFinder.csproj -c Release -r ${{ matrix.rid }}
+          --self-contained true -o publish
+          -p:Version=${{ steps.version.outputs.version }}
+
+      - name: Make MacPartsFinder.app
+        run: bash build/make-app-bundle.sh publish dmg/MacPartsFinder.app ${{ steps.version.outputs.version }}
+
+      - name: Ad-hoc sign
+        run: codesign --force --deep --sign - dmg/MacPartsFinder.app
+
+      - name: Make .dmg
+        run: |
+          ln -s /Applications dmg/Applications   # so the app can be dragged straight into Applications
+          hdiutil create -volname MacPartsFinder -srcfolder dmg -format UDZO -ov MacPartsFinder-mac-${{ matrix.label }}.dmg
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: MacPartsFinder-mac-${{ matrix.label }}
+          path: MacPartsFinder-mac-${{ matrix.label }}.dmg
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dmgs
+          merge-multiple: true
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          prerelease: true
+          files: dmgs/*.dmg
+          body: |
+            Test build of MacPartsFinder, the Mac edition of WinPartsFinder.
+            - **MacPartsFinder-mac-arm64.dmg** - Apple Silicon Macs (M1 and later)
+            - **MacPartsFinder-mac-intel.dmg** - older Intel Macs
+
+            Not signed by Apple yet, so the first time you open it, macOS will block it.
+            Go to **System Settings > Privacy & Security** and click **Open Anyway** - see the README for details.
