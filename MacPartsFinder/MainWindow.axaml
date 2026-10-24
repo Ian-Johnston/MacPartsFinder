@@ -1,9 +1,146 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
-        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-        mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
+        xmlns:local="using:MacPartsFinder"
         x:Class="MacPartsFinder.MainWindow"
+        Width="1264" Height="681" MinWidth="800" MinHeight="400"
+        WindowStartupLocation="CenterScreen"
         Title="MacPartsFinder">
-    Welcome to Avalonia!
+
+    <Window.Styles>
+        <Style Selector="WrapPanel#toolbar > :is(Control)">
+            <Setter Property="Margin" Value="0,2,6,2" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+        <Style Selector="DataGrid">
+            <Setter Property="FontSize" Value="12" />
+        </Style>
+        <Style Selector="DataGridCell.right">
+            <Setter Property="HorizontalContentAlignment" Value="Right" />
+        </Style>
+        <Style Selector="HyperlinkButton">
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="FontSize" Value="12" />
+        </Style>
+
+        <!-- Results colours, as in WinPartsFinder: website-link rows blue italic, no stock grey, stock green, # quieter -->
+        <Style Selector="DataGridCell.muted">
+            <Setter Property="Foreground" Value="#6D6D6D" />
+        </Style>
+        <Style Selector="DataGridRow.link DataGridCell">
+            <Setter Property="Foreground" Value="RoyalBlue" />
+            <Setter Property="FontStyle" Value="Italic" />
+        </Style>
+        <Style Selector="DataGridRow.nostock DataGridCell">
+            <Setter Property="Foreground" Value="#6D6D6D" />
+        </Style>
+        <Style Selector="DataGridRow.instock DataGridCell.stock">
+            <Setter Property="Foreground" Value="DarkGreen" />
+        </Style>
+
+        <!-- Supplier list: suppliers with no key are greyed; the tooltip says how the search went -->
+        <Style Selector="DataGridRow.unconfigured DataGridCell">
+            <Setter Property="Foreground" Value="#6D6D6D" />
+        </Style>
+        <Style Selector="DataGrid#gridSuppliers DataGridRow" x:DataType="local:SupplierRow">
+            <Setter Property="ToolTip.Tip" Value="{Binding Tip}" />
+        </Style>
+    </Window.Styles>
+
+    <DockPanel>
+        <!-- Toolbar -->
+        <WrapPanel x:Name="toolbar" DockPanel.Dock="Top" Margin="8,6,8,4">
+            <TextBlock Text="Search:" />
+            <TextBox x:Name="txtSearch" Width="240"
+                     ToolTip.Tip="Part number or keywords to search for, e.g. LM358 or 10uF 25V 0805.&#10;Press Enter to search." />
+            <ComboBox x:Name="cboMode" Width="180"
+                      ToolTip.Tip="Keyword: searches descriptions and part numbers.&#10;Manufacturer part no.: looks for parts whose manufacturer part number starts with what you typed." />
+            <TextBlock Text="Max/supp.:" />
+            <NumericUpDown x:Name="nudMax" Width="110" Minimum="1" Maximum="50" Increment="1" FormatString="0"
+                           ToolTip.Tip="How many results to fetch from each supplier per search, and per Load more (up to 50).&#10;Fewer is faster. Each search or Load more uses one call of each supplier's daily API allowance." />
+            <Button x:Name="btnSearch" Content="Search" IsDefault="True" Click="BtnSearch_Click"
+                    ToolTip.Tip="Search every ticked supplier at once (Enter)." />
+            <Button x:Name="btnCancel" Content="Cancel" IsEnabled="False" Click="BtnCancel_Click"
+                    ToolTip.Tip="Stop any searches still running." />
+            <Button x:Name="btnLoadMore" Content="Load more" IsEnabled="False" Click="BtnLoadMore_Click"
+                    ToolTip.Tip="Fetch the next batch (Max/supp.) from every ticked supplier that has more - see Hits, e.g. 50 / 312.&#10;Uses one API call per supplier. New rows are added at the end and selected - click the Supplier header to group them." />
+            <CheckBox x:Name="chkInStock" Content="In stock only" IsCheckedChanged="ChkInStock_Changed"
+                      ToolTip.Tip="Hide parts with no stock. Website-link rows always stay." />
+            <TextBlock Text="Filter:" />
+            <TextBox x:Name="txtFilter" Width="150" PlaceholderText="narrow results…" TextChanged="TxtFilter_TextChanged"
+                     ToolTip.Tip="Narrow the current results as you type.&#10;Matches supplier, supplier part no., mfr part no., manufacturer, type and description." />
+            <Button x:Name="btnKeys" Content="API keys (test)…" Click="BtnKeys_Click"
+                    ToolTip.Tip="Temporary, for testing: enter your own API keys. The full Settings window replaces this later." />
+        </WrapPanel>
+
+        <!-- Status bar -->
+        <DockPanel DockPanel.Dock="Bottom" Margin="8,3,8,4">
+            <TextBlock x:Name="lblTotal" DockPanel.Dock="Right" Text="Total parts = 0" Margin="12,0,0,0" />
+            <TextBlock x:Name="lblStatus" Text="Ready" TextTrimming="CharacterEllipsis" />
+        </DockPanel>
+
+        <Grid ColumnDefinitions="440,5,*">
+            <!-- Supplier list -->
+            <DataGrid x:Name="gridSuppliers" Grid.Column="0" IsReadOnly="True" CanUserSortColumns="False"
+                      SelectionMode="Single" HeadersVisibility="Column" GridLinesVisibility="Horizontal"
+                      LoadingRow="GridSuppliers_LoadingRow" DoubleTapped="GridSuppliers_DoubleTapped">
+                <DataGrid.Columns>
+                    <DataGridTemplateColumn Header="Supplier" Width="140">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate x:DataType="local:SupplierRow">
+                                <CheckBox IsChecked="{Binding IsChecked}" Content="{Binding Name}" Margin="8,0,0,0" FontSize="12" />
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
+                    <DataGridTextColumn Header="Mode" Binding="{Binding ModeText}" x:DataType="local:SupplierRow" Width="90" />
+                    <DataGridTextColumn Header="Status" Binding="{Binding Status}" x:DataType="local:SupplierRow" Width="90" />
+                    <DataGridTextColumn Header="Hits" Binding="{Binding Hits}" x:DataType="local:SupplierRow" Width="70" CellStyleClasses="right" />
+                    <DataGridTextColumn Header="Time" Binding="{Binding Time}" x:DataType="local:SupplierRow" Width="*" />
+                </DataGrid.Columns>
+            </DataGrid>
+
+            <GridSplitter Grid.Column="1" ResizeDirection="Columns" />
+
+            <!-- Results -->
+            <DataGrid x:Name="gridResults" Grid.Column="2" IsReadOnly="True" SelectionMode="Extended"
+                      CanUserReorderColumns="True" CanUserResizeColumns="True" CanUserSortColumns="True"
+                      FrozenColumnCount="1" HeadersVisibility="Column" GridLinesVisibility="All"
+                      LoadingRow="GridResults_LoadingRow" DoubleTapped="GridResults_DoubleTapped">
+                <DataGrid.Columns>
+                    <DataGridTextColumn Header="#" Binding="{Binding No}" x:DataType="local:ResultRow" Width="42"
+                                        CellStyleClasses="right muted" CanUserReorder="False" />
+                    <DataGridTextColumn Header="Supplier" Binding="{Binding Supplier}" x:DataType="local:ResultRow" Width="90"
+                                        SortMemberPath="Seq" />
+                    <DataGridTemplateColumn Header="Supplier part no." Width="110" SortMemberPath="SupplierPartNo">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate x:DataType="local:ResultRow">
+                                <HyperlinkButton Content="{Binding SupplierPartText}" IsVisible="{Binding HasProductLink}"
+                                                 Click="ProductLink_Click" Margin="4,0" ToolTip.Tip="Click to open the product page" />
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
+                    <DataGridTextColumn Header="Mfr part no." Binding="{Binding MfrPartNo}" x:DataType="local:ResultRow" Width="140" />
+                    <DataGridTextColumn Header="Manufacturer" Binding="{Binding Manufacturer}" x:DataType="local:ResultRow" Width="110" />
+                    <DataGridTextColumn Header="Type" Binding="{Binding Type}" x:DataType="local:ResultRow" Width="160" />
+                    <DataGridTextColumn Header="Description" Binding="{Binding Description}" x:DataType="local:ResultRow" Width="280" />
+                    <DataGridTextColumn Header="Stock" Binding="{Binding Stock, StringFormat='{}{0:#,##0}'}" x:DataType="local:ResultRow"
+                                        Width="60" CellStyleClasses="right stock" />
+                    <DataGridTextColumn Tag="UnitPrice" Header="Price (1)" Binding="{Binding UnitPrice, StringFormat='{}{0:#,##0.00##}'}"
+                                        x:DataType="local:ResultRow" Width="70" CellStyleClasses="right" />
+                    <DataGridTextColumn Header="Cur" Binding="{Binding Currency}" x:DataType="local:ResultRow" Width="45" />
+                    <DataGridTextColumn Header="Price breaks" Binding="{Binding PriceBreaks}" x:DataType="local:ResultRow" Width="220" />
+                    <DataGridTextColumn Header="MOQ" Binding="{Binding Moq}" x:DataType="local:ResultRow" Width="50" CellStyleClasses="right" />
+                    <DataGridTextColumn Header="Availability / lead" Binding="{Binding Availability}" x:DataType="local:ResultRow" Width="110" />
+                    <DataGridTemplateColumn Header="Datasheet" Width="80" SortMemberPath="DatasheetUrl">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate x:DataType="local:ResultRow">
+                                <HyperlinkButton Content="Datasheet" IsVisible="{Binding HasDatasheet}" Click="DatasheetLink_Click"
+                                                 Margin="4,0" ToolTip.Tip="{Binding DatasheetUrl}" />
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
+                    <DataGridTextColumn Header="Status" Binding="{Binding Status}" x:DataType="local:ResultRow" Width="70" />
+                </DataGrid.Columns>
+            </DataGrid>
+        </Grid>
+    </DockPanel>
 </Window>
