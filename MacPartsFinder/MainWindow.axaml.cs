@@ -106,20 +106,20 @@ public partial class MainWindow : Window
         {
             _normalPosition = Position;
             _normalSize = ClientSize;
-            txtSearch.Focus();
+            cboSearch.Focus();
             if (_settings.LoadError.Length > 0) await MessageBox.Show(this, _settings.LoadError, Title ?? "");
         };
         PositionChanged += (_, _) =>
         {
             if (WindowState == WindowState.Normal) _normalPosition = Position;
-            HideRecent();
+            HideSuggestions();
         };
         SizeChanged += (_, _) =>
         {
             if (WindowState == WindowState.Normal) _normalSize = ClientSize;
-            HideRecent();
+            HideSuggestions();
         };
-        Deactivated += (_, _) => HideRecent();
+        Deactivated += (_, _) => HideSuggestions();
         Closing += (_, _) =>
         {
             _cts?.Cancel();
@@ -265,132 +265,161 @@ public partial class MainWindow : Window
 
     #region Recent searches
 
-    // Click into the Search box and pause, and the last 20 drop down under it. Typing suggests earlier
-    // searches that start the same way. The Search box keeps the keyboard throughout.
-    private const int RecentShown = 20;
-    private readonly DispatcherTimer _recentTimer = new() { Interval = TimeSpan.FromMilliseconds(1500) };
-    private bool _fillingFromRecent;
+    // The Search box is an editable drop-down: type as normal (earlier searches that start the same way are
+    // suggested underneath), or click its arrow (or ⌥↓) to pick one of the last 30. Picking one only fills
+    // the box - Return or Search runs it.
+    private const int RecentShown = 30;
+    private bool _fillingSearchBox;
+    private bool _listWasOpen;
+
+    private string SearchText => (cboSearch.Text ?? "").Trim();
 
     private void SetUpRecentSearches()
     {
-        popRecent.PlacementTarget = txtSearch;
-        _recentTimer.Tick += (_, _) =>
+        popSuggest.PlacementTarget = cboSearch;
+        RefreshRecentList();
+        cboSearch.AddHandler(KeyDownEvent, SearchBox_KeyDown, RoutingStrategies.Tunnel);
+        cboSearch.AddHandler(KeyDownEvent, SearchBox_KeyDownAfter, RoutingStrategies.Bubble, handledEventsToo: true);
+        cboSearch.PropertyChanged += (_, e) =>
         {
-            _recentTimer.Stop();
-            if (txtSearch.IsFocused && !_busy) ShowRecent(_settings.RecentSearches.Take(RecentShown).ToList());
+            if (e.Property == ComboBox.TextProperty) SearchText_Changed();
+            else if (e.Property == ComboBox.IsDropDownOpenProperty && cboSearch.IsDropDownOpen) HideSuggestions();
         };
-        txtSearch.AddHandler(PointerPressedEvent, (_, _) =>
+        cboSearch.LostFocus += (_, _) =>
         {
-            _recentTimer.Stop();
-            if (_settings.RecentSearches.Count > 0 && !RecentVisible) _recentTimer.Start();
-        }, RoutingStrategies.Tunnel, handledEventsToo: true);
-        txtSearch.AddHandler(KeyDownEvent, TxtSearch_KeyDown, RoutingStrategies.Tunnel);
-        txtSearch.TextChanged += (_, _) =>
-        {
-            if (_fillingFromRecent) return;
-            _recentTimer.Stop();
-            var typed = (txtSearch.Text ?? "").Trim();
-            var matches = typed.Length == 0
-                ? new List<string>()
-                : _settings.RecentSearches.Where(r => r.StartsWith(typed, StringComparison.OrdinalIgnoreCase) &&
-                                                      !r.Equals(typed, StringComparison.OrdinalIgnoreCase))
-                                          .Take(RecentShown).ToList();
-            if (matches.Count > 0 && !_busy) ShowRecent(matches); else HideRecent();
-        };
-        txtSearch.LostFocus += (_, _) =>
-        {
-            _recentTimer.Stop();
-            // Clicking an item in the list must not close it before the click lands.
-            if (RecentVisible && lstRecent.IsPointerOver) return;
-            HideRecent();
+            // Clicking a suggestion must not close the list before the click lands.
+            if (SuggestionsVisible && lstSuggest.IsPointerOver) return;
+            HideSuggestions();
         };
     }
 
-    private bool RecentVisible => popRecent.IsOpen;
-
-    private void ShowRecent(List<string> items)
+    /// <summary>Fills the drop-down with the last 30 searches (after each search), keeping what's in the box.</summary>
+    private void RefreshRecentList()
     {
-        if (items.Count == 0) return;
-        lstRecent.ItemsSource = items;
-        lstRecent.SelectedIndex = -1;
-        lstRecent.MinWidth = txtSearch.Bounds.Width;
-        popRecent.IsOpen = true;
+        var typed = cboSearch.Text; // refilling the list can clear the text
+        _fillingSearchBox = true;
+        cboSearch.ItemsSource = _settings.RecentSearches.Take(RecentShown).ToList();
+        cboSearch.SelectedItem = null;
+        cboSearch.Text = typed;
+        _fillingSearchBox = false;
     }
 
-    private void HideRecent()
+    /// <summary>Puts text in the Search box without suggestions popping up (it doesn't search).</summary>
+    private void SetSearchText(string text)
     {
-        _recentTimer.Stop();
-        if (RecentVisible) popRecent.IsOpen = false;
+        _fillingSearchBox = true;
+        cboSearch.Text = text;
+        _fillingSearchBox = false;
+        HideSuggestions();
+        MoveCaretToEnd();
     }
 
-    /// <summary>Puts the chosen search in the box (it doesn't search - change the mode or edit it first if you like).</summary>
-    private void FillFromRecent(string? text)
+    private void MoveCaretToEnd()
     {
-        if (string.IsNullOrEmpty(text)) return;
-        _fillingFromRecent = true;
-        txtSearch.Text = text;
-        _fillingFromRecent = false;
-        HideRecent();
-        txtSearch.Focus();
-        txtSearch.SelectionStart = txtSearch.SelectionEnd = txtSearch.CaretIndex = text.Length;
+        if (cboSearch.FindDescendantOfType<TextBox>() is { } box)
+            box.SelectionStart = box.SelectionEnd = box.CaretIndex = (box.Text ?? "").Length;
     }
 
-    private void LstRecent_PointerMoved(object? sender, PointerEventArgs e)
+    /// <summary>Typing: earlier searches that start the same way are suggested underneath.</summary>
+    private void SearchText_Changed()
     {
-        if ((e.Source as Control)?.FindAncestorOfType<ListBoxItem>(includeSelf: true) is { } item)
-            lstRecent.SelectedItem = item.DataContext;
-    }
-
-    private void LstRecent_Tapped(object? sender, TappedEventArgs e)
-    {
-        if ((e.Source as Control)?.FindAncestorOfType<ListBoxItem>(includeSelf: true) is { } item)
-            FillFromRecent(item.DataContext as string);
-    }
-
-    /// <summary>Keys for the recent-searches list, while the Search box has focus.</summary>
-    private void TxtSearch_KeyDown(object? sender, KeyEventArgs e)
-    {
-        if (e.KeyModifiers != KeyModifiers.None) return;
-        if (!RecentVisible)
+        if (_fillingSearchBox || cboSearch.IsDropDownOpen) return;
+        // (Picking from the drop-down changes the text too - that isn't typing.)
+        if (cboSearch.SelectedItem is string picked && picked == cboSearch.Text)
         {
-            // Down opens it straight away - when the box is empty or all selected, so it doesn't clash with editing.
-            var len = (txtSearch.Text ?? "").Length;
-            var allSelected = Math.Abs(txtSearch.SelectionEnd - txtSearch.SelectionStart) == len;
-            if (e.Key == Key.Down && (len == 0 || allSelected))
-            {
-                _recentTimer.Stop();
-                ShowRecent(_settings.RecentSearches.Take(RecentShown).ToList());
-                e.Handled = RecentVisible;
-            }
+            HideSuggestions();
             return;
         }
-        var count = lstRecent.ItemCount;
+        var typed = SearchText;
+        var matches = typed.Length == 0
+            ? new List<string>()
+            : _settings.RecentSearches.Where(r => r.StartsWith(typed, StringComparison.OrdinalIgnoreCase) &&
+                                                  !r.Equals(typed, StringComparison.OrdinalIgnoreCase))
+                                      .Take(RecentShown).ToList();
+        if (matches.Count > 0 && !_busy && cboSearch.IsKeyboardFocusWithin) ShowSuggestions(matches); else HideSuggestions();
+    }
+
+    private bool SuggestionsVisible => popSuggest.IsOpen;
+
+    private void ShowSuggestions(List<string> items)
+    {
+        lstSuggest.ItemsSource = items;
+        lstSuggest.SelectedIndex = -1;
+        lstSuggest.MinWidth = cboSearch.Bounds.Width;
+        popSuggest.IsOpen = true;
+    }
+
+    private void HideSuggestions()
+    {
+        if (SuggestionsVisible) popSuggest.IsOpen = false;
+    }
+
+    private void LstSuggest_PointerMoved(object? sender, PointerEventArgs e)
+    {
+        if ((e.Source as Control)?.FindAncestorOfType<ListBoxItem>(includeSelf: true) is { } item)
+            lstSuggest.SelectedItem = item.DataContext;
+    }
+
+    private void LstSuggest_Tapped(object? sender, TappedEventArgs e)
+    {
+        if ((e.Source as Control)?.FindAncestorOfType<ListBoxItem>(includeSelf: true) is { DataContext: string picked })
+        {
+            SetSearchText(picked);
+            cboSearch.Focus();
+        }
+    }
+
+    /// <summary>Keys in the Search box, before the box itself handles them.</summary>
+    private void SearchBox_KeyDown(object? sender, KeyEventArgs e)
+    {
+        _listWasOpen = cboSearch.IsDropDownOpen;
+        // ⌥↓ (Alt+↓ on Windows) opens and closes the last 30 searches.
+        if ((e.Key == Key.Down || e.Key == Key.Up) && e.KeyModifiers == KeyModifiers.Alt)
+        {
+            HideSuggestions();
+            cboSearch.IsDropDownOpen = !cboSearch.IsDropDownOpen;
+            e.Handled = true;
+            return;
+        }
+        // Up / Down / Return / Esc in the suggestions shown while typing.
+        if (e.KeyModifiers != KeyModifiers.None || !SuggestionsVisible) return;
+        var count = lstSuggest.ItemCount;
         switch (e.Key)
         {
             case Key.Down:
-                lstRecent.SelectedIndex = Math.Min(count - 1, lstRecent.SelectedIndex + 1);
+                lstSuggest.SelectedIndex = Math.Min(count - 1, lstSuggest.SelectedIndex + 1);
                 e.Handled = true;
                 break;
             case Key.Up:
-                lstRecent.SelectedIndex = Math.Max(-1, lstRecent.SelectedIndex - 1);
+                lstSuggest.SelectedIndex = Math.Max(-1, lstSuggest.SelectedIndex - 1);
                 e.Handled = true;
                 break;
             case Key.Enter:
-                if (lstRecent.SelectedItem is string picked)
+                if (lstSuggest.SelectedItem is string picked)
                 {
-                    FillFromRecent(picked);
+                    SetSearchText(picked);
                     e.Handled = true;
                 }
                 else
                 {
-                    HideRecent(); // nothing picked: Enter searches as normal
+                    HideSuggestions(); // nothing picked: Return searches as normal
                 }
                 break;
             case Key.Escape:
-                HideRecent();
+                HideSuggestions();
                 e.Handled = true;
                 break;
         }
+    }
+
+    /// <summary>Return in the open list of last 30 just picks that search (it would otherwise also press Search).</summary>
+    private void SearchBox_KeyDownAfter(object? sender, KeyEventArgs e)
+    {
+        if (e.Key != Key.Enter || !_listWasOpen) return;
+        _listWasOpen = false;
+        cboSearch.IsDropDownOpen = false;
+        MoveCaretToEnd();
+        e.Handled = true;
     }
 
     #endregion
@@ -846,7 +875,7 @@ public partial class MainWindow : Window
         // A normal search: just the toolbar settings, no Advanced filters.
         await RunSearchAsync(new AdvancedSearchOptions
         {
-            Query = (txtSearch.Text ?? "").Trim(),
+            Query = SearchText,
             Mode = cboMode.SelectedIndex == 1 ? SearchMode.PartNumber : SearchMode.Keyword,
             MaxResults = MaxPerSupplier
         });
@@ -859,7 +888,7 @@ public partial class MainWindow : Window
         var query = opts.Query;
         if (query.Length == 0)
         {
-            txtSearch.Focus();
+            cboSearch.Focus();
             return;
         }
         if (_busy) return;
@@ -871,6 +900,7 @@ public partial class MainWindow : Window
         }
 
         _settings.AddRecentSearch(query);
+        RefreshRecentList();
         _rows.Clear();
         _paging.Clear();
         _searched.Clear();
@@ -1219,7 +1249,11 @@ public partial class MainWindow : Window
     private void SetBusy(bool busy)
     {
         _busy = busy;
-        if (busy) HideRecent();
+        if (busy)
+        {
+            HideSuggestions();
+            cboSearch.IsDropDownOpen = false;
+        }
         btnSearch.IsEnabled = !busy;
         btnAdvanced.IsEnabled = !busy;
         btnCancel.IsEnabled = busy;
@@ -1278,7 +1312,7 @@ public partial class MainWindow : Window
 
     private void CmsSuppliers_Opening(object? sender, CancelEventArgs e)
     {
-        var hasQuery = (txtSearch.Text ?? "").Trim().Length > 0;
+        var hasQuery = SearchText.Length > 0;
         var s = SelectedSupplier?.Supplier;
         mnuOpenSupplierSearch.IsEnabled = hasQuery && s != null;
         mnuOpenAllSearches.IsEnabled = hasQuery;
@@ -1293,21 +1327,21 @@ public partial class MainWindow : Window
 
     private void MnuOpenSupplierSearch_Click(object? sender, RoutedEventArgs e)
     {
-        if (SelectedSupplier is { } item) OpenUrl(item.Supplier.GetSearchUrl((txtSearch.Text ?? "").Trim()));
+        if (SelectedSupplier is { } item) OpenUrl(item.Supplier.GetSearchUrl(SearchText));
     }
 
     private void MnuOpenAllSearches_Click(object? sender, RoutedEventArgs e)
     {
         foreach (var item in _supplierRows.Where(i => i.IsChecked))
         {
-            OpenUrl(item.Supplier.GetSearchUrl((txtSearch.Text ?? "").Trim()));
+            OpenUrl(item.Supplier.GetSearchUrl(SearchText));
         }
     }
 
     /// <summary>Double-click a supplier: open the search on its website.</summary>
     private void GridSuppliers_DoubleTapped(object? sender, TappedEventArgs e)
     {
-        var query = (txtSearch.Text ?? "").Trim();
+        var query = SearchText;
         if (query.Length == 0 || e.Source is not Control c || c.FindAncestorOfType<CheckBox>(includeSelf: true) != null) return;
         if (c.FindAncestorOfType<DataGridRow>(includeSelf: true)?.DataContext is SupplierRow s) OpenUrl(s.Supplier.GetSearchUrl(query));
     }
@@ -1319,11 +1353,11 @@ public partial class MainWindow : Window
     private async void BtnAdvanced_Click(object? sender, RoutedEventArgs e)
     {
         if (_busy || !btnAdvanced.IsEffectivelyEnabled) return;
-        HideRecent();
+        HideSuggestions();
         // Open with last time's choices, but today's search text, batch size and ticked suppliers.
         var start = _settings.LastAdvanced;
         // (Unless Search for was left blank last time and the search box still shows those words.)
-        var typed = (txtSearch.Text ?? "").Trim();
+        var typed = SearchText;
         if (typed.Length > 0 && !(start.ContainsIsQuery && string.Equals(typed, start.Query, StringComparison.OrdinalIgnoreCase)))
         {
             start.Query = typed;
@@ -1335,9 +1369,7 @@ public partial class MainWindow : Window
         var o = await new AdvancedSearchWindow(start, _suppliers.Select(s => s.Name).ToList()).ShowDialog<AdvancedSearchOptions?>(this);
         if (o == null) return;
         _settings.LastAdvanced = o;
-        _fillingFromRecent = true; // (not typing - no suggestions)
-        txtSearch.Text = o.Query;
-        _fillingFromRecent = false;
+        SetSearchText(o.Query);
         nudMax.Value = Math.Max(1, Math.Min(50, o.MaxResults));
 
         // Make the supplier list match the window (without the "ticked after a search" auto-search).
@@ -1381,7 +1413,7 @@ public partial class MainWindow : Window
 
     private async void BtnSettings_Click(object? sender, RoutedEventArgs e)
     {
-        HideRecent();
+        HideSuggestions();
         var dlg = new SettingsWindow(_settings);
         if (!await dlg.ShowDialog<bool>(this)) return;
         if (dlg.ResetWindowRequested) ResetWindowLayout();
@@ -1447,7 +1479,7 @@ public partial class MainWindow : Window
             await MessageBox.Show(this, "Nothing to export yet.", Title ?? "");
             return;
         }
-        var safeName = string.Concat((txtSearch.Text ?? "").Trim().Split(Path.GetInvalidFileNameChars()));
+        var safeName = string.Concat(SearchText.Split(Path.GetInvalidFileNameChars()));
         var file = await StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
         {
             Title = "Export CSV",

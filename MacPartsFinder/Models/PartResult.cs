@@ -134,7 +134,7 @@ public class AdvancedSearchOptions
         return string.Join(", ", bits);
     }
 
-    /// <summary>The Description also contains words to check in each part - none when they were the search itself.</summary>
+    /// <summary>The Description contains words to check in each part - none when they were the search itself.</summary>
     private string WordsToCheck => ContainsIsQuery ? "" : MustContain.Trim();
 
     /// <summary>True if any of the app-side filters are set.</summary>

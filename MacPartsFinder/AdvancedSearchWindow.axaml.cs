@@ -53,9 +53,19 @@ public partial class AdvancedSearchWindow : Window
         ShowOptions(start ?? new AdvancedSearchOptions());
         Opened += (_, _) =>
         {
+            FitSupplierColumns();
             txtQuery.Focus();
             txtQuery.SelectAll();
         };
+    }
+
+    private void LstSuppliers_SizeChanged(object? sender, SizeChangedEventArgs e) => FitSupplierColumns();
+
+    // Two columns exactly fill the supplier list, so it only scrolls sideways if it ever needs a third.
+    private void FitSupplierColumns()
+    {
+        if (lstSuppliers.ItemsPanelRoot is WrapPanel panel && lstSuppliers.Bounds.Width > 0)
+            panel.ItemWidth = Math.Max(60, Math.Floor((lstSuppliers.Bounds.Width - 4) / 2));
     }
 
     private void ShowOptions(AdvancedSearchOptions o)
@@ -97,7 +107,7 @@ public partial class AdvancedSearchWindow : Window
         }
         if (query.Length < 2)
         {
-            await MessageBox.Show(this, "Type at least 2 characters in Search for (or in Manufacturer part no. contains / Description also contains).", Title ?? "");
+            await MessageBox.Show(this, "Type at least 2 characters in Search for (or in Manufacturer part no. contains / Description contains).", Title ?? "");
             txtQuery.Focus();
             return;
         }

@@ -55,8 +55,8 @@
             <Setter Property="Foreground" Value="{Binding $parent[DataGridCell].Foreground}" />
         </Style>
 
-        <!-- Recent searches list: never takes the keyboard from the Search box -->
-        <Style Selector="ListBox#lstRecent ListBoxItem">
+        <!-- Suggestions while typing: never take the keyboard from the Search box -->
+        <Style Selector="ListBox#lstSuggest ListBoxItem">
             <Setter Property="Focusable" Value="False" />
             <Setter Property="Padding" Value="6,2" />
             <Setter Property="MinHeight" Value="0" />
@@ -72,8 +72,8 @@
             </StackPanel>
             <WrapPanel x:Name="toolbarLeft">
                 <TextBlock Text="Search:" />
-                <TextBox x:Name="txtSearch" Width="190"
-                         ToolTip.Tip="Part number or keywords to search for, e.g. LM358 or 10uF 25V 0805.&#10;Press Enter to search. Click in the box and pause to see your last 20 searches; matching ones are also suggested as you type." />
+                <ComboBox x:Name="cboSearch" Width="190" IsEditable="True" MaxDropDownHeight="520"
+                          ToolTip.Tip="Part number or keywords to search for, e.g. LM358 or 10uF 25V 0805. Press Return to search.&#10;Click the arrow (or press ⌥↓) to pick one of your last 30 searches; matching ones are also suggested as you type." />
                 <ComboBox x:Name="cboMode" Width="145"
                           ToolTip.Tip="Keyword: searches descriptions and part numbers.&#10;Manufacturer part no.: looks for parts whose manufacturer part number starts with what you typed." />
                 <TextBlock Text="Max/supp.:" />
@@ -100,11 +100,11 @@
                         ToolTip.Tip="API keys, supplier search URLs, your own suppliers, photos, dark mode and window layout." />
             </WrapPanel>
 
-            <!-- Recent searches / suggestions, dropped down under the Search box (placed in code) -->
-            <Popup x:Name="popRecent" Placement="BottomEdgeAlignedLeft" IsLightDismissEnabled="False">
+            <!-- Earlier searches suggested while typing, dropped down under the Search box (placed in code) -->
+            <Popup x:Name="popSuggest" Placement="BottomEdgeAlignedLeft" IsLightDismissEnabled="False">
                 <Border BorderBrush="Gray" BorderThickness="1">
-                    <ListBox x:Name="lstRecent" Focusable="False" MaxHeight="420"
-                             Tapped="LstRecent_Tapped" PointerMoved="LstRecent_PointerMoved" />
+                    <ListBox x:Name="lstSuggest" Focusable="False" MaxHeight="420"
+                             Tapped="LstSuggest_Tapped" PointerMoved="LstSuggest_PointerMoved" />
                 </Border>
             </Popup>
         </DockPanel>

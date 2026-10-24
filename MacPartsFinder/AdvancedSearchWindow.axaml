@@ -36,7 +36,7 @@
               RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,*">
             <TextBlock Grid.Row="0" Text="Search for:" />
             <TextBox Grid.Row="0" Grid.Column="1" x:Name="txtQuery"
-                     ToolTip.Tip="Part number, keywords or a supplier order code (2-40 characters for TME).&#10;Leave blank to search for the Manufacturer part no. contains and Description also contains text instead." />
+                     ToolTip.Tip="Part number, keywords or a supplier order code (2-40 characters for TME).&#10;Leave blank to search for the Manufacturer part no. contains and Description contains text instead." />
 
             <TextBlock Grid.Row="1" Text="Search type:" />
             <ComboBox Grid.Row="1" Grid.Column="1" x:Name="cboMode" HorizontalAlignment="Stretch"
@@ -60,9 +60,9 @@
 
             <TextBlock Grid.Row="5" Text="Manufacturer part no. contains:" />
             <TextBox Grid.Row="5" Grid.Column="1" x:Name="txtPartNo"
-                     ToolTip.Tip="Only parts whose manufacturer part number contains this, anywhere in it, e.g. 931G finds KSC931G LFS.&#10;Tip: leave Search for blank and put what the part is in Description also contains, e.g. switch -&#10;the two are then searched for together. DigiKey and Mouser match part of a number; Farnell, CPC and Newark don't." />
+                     ToolTip.Tip="Only parts whose manufacturer part number contains this, anywhere in it, e.g. 931G finds KSC931G LFS.&#10;Tip: leave Search for blank and put what the part is in Description contains, e.g. switch -&#10;the two are then searched for together. DigiKey and Mouser match part of a number; Farnell, CPC and Newark don't." />
 
-            <TextBlock Grid.Row="6" Text="Description also contains:" />
+            <TextBlock Grid.Row="6" Text="Description contains:" />
             <TextBox Grid.Row="6" Grid.Column="1" x:Name="txtContains"
                      ToolTip.Tip="Only parts whose description (or part number) contains all of these words, e.g. SOIC or 0603 X7R.&#10;With Search for blank, these words become the search instead (matched the suppliers' own way)." />
 
@@ -81,8 +81,16 @@
                            ToolTip.Tip="How many results to fetch from each supplier (up to 50). Load more works as normal afterwards." />
 
             <TextBlock Grid.Row="10" Text="Suppliers to search:" VerticalAlignment="Top" Margin="0,6,0,0" />
+            <!-- Two columns, filled top to bottom then across; it only scrolls sideways if it ever needs a third. -->
             <ListBox Grid.Row="10" Grid.RowSpan="3" Grid.Column="1" x:Name="lstSuppliers" Margin="0,6,0,0"
+                     ScrollViewer.HorizontalScrollBarVisibility="Auto" ScrollViewer.VerticalScrollBarVisibility="Disabled"
+                     SizeChanged="LstSuppliers_SizeChanged"
                      ToolTip.Tip="Which suppliers to search. The supplier list on the main window is updated to match.">
+                <ListBox.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <WrapPanel Orientation="Vertical" />
+                    </ItemsPanelTemplate>
+                </ListBox.ItemsPanel>
                 <ListBox.ItemTemplate>
                     <DataTemplate x:DataType="local:CheckItem">
                         <CheckBox IsChecked="{Binding IsChecked}" Content="{Binding Name}" MinHeight="0" />
