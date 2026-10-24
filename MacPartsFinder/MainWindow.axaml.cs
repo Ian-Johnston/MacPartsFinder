@@ -5,13 +5,20 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Diagnostics;
+using System.IO;
 using System.Linq;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using Avalonia;
 using Avalonia.Collections;
 using Avalonia.Controls;
 using Avalonia.Input;
+using Avalonia.Input.Platform;
 using Avalonia.Interactivity;
+using Avalonia.Platform.Storage;
+using Avalonia.Styling;
+using Avalonia.Threading;
 using Avalonia.VisualTree;
 
 namespace MacPartsFinder;
@@ -29,6 +36,20 @@ public partial class MainWindow : Window
     private CancellationTokenSource? _cts;
     private bool _loading;
 
+    private readonly ImageCache _images = new();
+    // First photo seen for each manufacturer part no., so suppliers without photos (Mouser) can borrow one.
+    private readonly Dictionary<string, (string Thumb, string Large)> _imagesByMpn = new();
+
+    private const double ThumbRowHeight = ImageCache.ThumbSize + 4;
+    private const double PlainRowHeight = 22;
+
+    // Default layout, for Settings > Reset window layout.
+    private readonly Dictionary<string, ColumnLayout> _defaultColumns;
+
+    // Normal (not maximised) position and size, kept up to date for saving.
+    private PixelPoint _normalPosition;
+    private Size _normalSize;
+
     #region Startup / shutdown
 
     public MainWindow()
@@ -36,6 +57,8 @@ public partial class MainWindow : Window
         InitializeComponent();
         _settings = AppSettings.Load();
         Title = $"MacPartsFinder - {AppVersion}  (test build)";
+        if (Application.Current != null)
+            Application.Current.RequestedThemeVariant = _settings.DarkMode ? ThemeVariant.Dark : ThemeVariant.Light;
 
         cboMode.ItemsSource = new[] { "Keyword", "Manufacturer part no." };
         cboMode.SelectedIndex = 0;
@@ -50,19 +73,44 @@ public partial class MainWindow : Window
         gridResults.ItemsSource = _view;
         gridSuppliers.ItemsSource = _supplierRows;
 
+        AddColumnHeaderTips();
+        _defaultColumns = CurrentColumnLayout();
+        ApplyColumnLayout(_settings.ResultColumns);
+        ApplyThumbnailSetting();
+        _images.ThumbnailReady += Images_ThumbnailReady;
+        RestoreWindowPlacement();
+
         RebuildSuppliers();
         ApplyFilter();
+        SetUpRecentSearches();
+
+        // Right-click selects the row under the mouse first (for the menus), as in WinPartsFinder.
+        gridResults.AddHandler(PointerPressedEvent, GridResults_PointerPressed, RoutingStrategies.Tunnel, handledEventsToo: true);
+        gridSuppliers.AddHandler(PointerPressedEvent, GridSuppliers_PointerPressed, RoutingStrategies.Tunnel, handledEventsToo: true);
 
         if (!_suppliers.Any(s => s.IsConfigured))
-            SetStatus("No API keys set yet - click API keys (test)… to add Mouser / DigiKey / element14 / TME keys. Until then you get website links.");
+            SetStatus("No API keys set yet - click API keys… to add Mouser / DigiKey / element14 / TME keys. Until then you get website links.");
         else
             SetStatus("Ready.");
 
         Opened += async (_, _) =>
         {
+            _normalPosition = Position;
+            _normalSize = ClientSize;
             txtSearch.Focus();
             if (_settings.LoadError.Length > 0) await MessageBox.Show(this, _settings.LoadError, Title ?? "");
         };
+        PositionChanged += (_, _) =>
+        {
+            if (WindowState == WindowState.Normal) _normalPosition = Position;
+            HideRecent();
+        };
+        SizeChanged += (_, _) =>
+        {
+            if (WindowState == WindowState.Normal) _normalSize = ClientSize;
+            HideRecent();
+        };
+        Deactivated += (_, _) => HideRecent();
         Closing += (_, _) =>
         {
             _cts?.Cancel();
@@ -70,8 +118,46 @@ public partial class MainWindow : Window
         };
     }
 
+    private void RestoreWindowPlacement()
+    {
+        var p = _settings.MainWindow;
+        if (p == null || p.Width < MinWidth || p.Height < MinHeight) return;
+        // Ignore it if that spot is no longer on any screen (e.g. a monitor was unplugged).
+        var visible = Screens.All.Any(s =>
+        {
+            var bounds = new PixelRect(p.X, p.Y, (int)(p.Width * s.Scaling), (int)(p.Height * s.Scaling));
+            var overlap = s.WorkingArea.Intersect(bounds);
+            return overlap.Width >= 200 && overlap.Height >= 100;
+        });
+        if (!visible) return;
+        WindowStartupLocation = WindowStartupLocation.Manual;
+        Position = new PixelPoint(p.X, p.Y);
+        Width = p.Width;
+        Height = p.Height;
+        if (p.Maximized) WindowState = WindowState.Maximized;
+        if (p.SplitterDistance > 0)
+        {
+            gridMain.ColumnDefinitions[0].Width = new GridLength(Math.Max(150, Math.Min(p.SplitterDistance, p.Width - 200)));
+        }
+    }
+
+    private WindowPlacement CurrentWindowPlacement()
+    {
+        return new WindowPlacement
+        {
+            X = _normalPosition.X,
+            Y = _normalPosition.Y,
+            Width = (int)_normalSize.Width,
+            Height = (int)_normalSize.Height,
+            Maximized = WindowState == WindowState.Maximized,
+            SplitterDistance = (int)gridMain.ColumnDefinitions[0].ActualWidth
+        };
+    }
+
     private void SaveUiSettings()
     {
+        _settings.MainWindow = CurrentWindowPlacement();
+        _settings.ResultColumns = CurrentColumnLayout();
         _settings.MaxResults = MaxPerSupplier;
         _settings.InStockOnly = chkInStock.IsChecked == true;
         foreach (var row in _supplierRows)
@@ -144,7 +230,262 @@ public partial class MainWindow : Window
 
     #endregion
 
+    #region Recent searches
+
+    // Click into the Search box and pause, and the last 20 drop down under it. Typing suggests earlier
+    // searches that start the same way. The Search box keeps the keyboard throughout.
+    private const int RecentShown = 20;
+    private readonly DispatcherTimer _recentTimer = new() { Interval = TimeSpan.FromMilliseconds(1500) };
+    private bool _fillingFromRecent;
+
+    private void SetUpRecentSearches()
+    {
+        popRecent.PlacementTarget = txtSearch;
+        _recentTimer.Tick += (_, _) =>
+        {
+            _recentTimer.Stop();
+            if (txtSearch.IsFocused && !_busy) ShowRecent(_settings.RecentSearches.Take(RecentShown).ToList());
+        };
+        txtSearch.AddHandler(PointerPressedEvent, (_, _) =>
+        {
+            _recentTimer.Stop();
+            if (_settings.RecentSearches.Count > 0 && !RecentVisible) _recentTimer.Start();
+        }, RoutingStrategies.Tunnel, handledEventsToo: true);
+        txtSearch.AddHandler(KeyDownEvent, TxtSearch_KeyDown, RoutingStrategies.Tunnel);
+        txtSearch.TextChanged += (_, _) =>
+        {
+            if (_fillingFromRecent) return;
+            _recentTimer.Stop();
+            var typed = (txtSearch.Text ?? "").Trim();
+            var matches = typed.Length == 0
+                ? new List<string>()
+                : _settings.RecentSearches.Where(r => r.StartsWith(typed, StringComparison.OrdinalIgnoreCase) &&
+                                                      !r.Equals(typed, StringComparison.OrdinalIgnoreCase))
+                                          .Take(RecentShown).ToList();
+            if (matches.Count > 0 && !_busy) ShowRecent(matches); else HideRecent();
+        };
+        txtSearch.LostFocus += (_, _) =>
+        {
+            _recentTimer.Stop();
+            // Clicking an item in the list must not close it before the click lands.
+            if (RecentVisible && lstRecent.IsPointerOver) return;
+            HideRecent();
+        };
+    }
+
+    private bool RecentVisible => popRecent.IsOpen;
+
+    private void ShowRecent(List<string> items)
+    {
+        if (items.Count == 0) return;
+        lstRecent.ItemsSource = items;
+        lstRecent.SelectedIndex = -1;
+        lstRecent.MinWidth = txtSearch.Bounds.Width;
+        popRecent.IsOpen = true;
+    }
+
+    private void HideRecent()
+    {
+        _recentTimer.Stop();
+        if (RecentVisible) popRecent.IsOpen = false;
+    }
+
+    /// <summary>Puts the chosen search in the box (it doesn't search - change the mode or edit it first if you like).</summary>
+    private void FillFromRecent(string? text)
+    {
+        if (string.IsNullOrEmpty(text)) return;
+        _fillingFromRecent = true;
+        txtSearch.Text = text;
+        _fillingFromRecent = false;
+        HideRecent();
+        txtSearch.Focus();
+        txtSearch.SelectionStart = txtSearch.SelectionEnd = txtSearch.CaretIndex = text.Length;
+    }
+
+    private void LstRecent_PointerMoved(object? sender, PointerEventArgs e)
+    {
+        if ((e.Source as Control)?.FindAncestorOfType<ListBoxItem>(includeSelf: true) is { } item)
+            lstRecent.SelectedItem = item.DataContext;
+    }
+
+    private void LstRecent_Tapped(object? sender, TappedEventArgs e)
+    {
+        if ((e.Source as Control)?.FindAncestorOfType<ListBoxItem>(includeSelf: true) is { } item)
+            FillFromRecent(item.DataContext as string);
+    }
+
+    /// <summary>Keys for the recent-searches list, while the Search box has focus.</summary>
+    private void TxtSearch_KeyDown(object? sender, KeyEventArgs e)
+    {
+        if (e.KeyModifiers != KeyModifiers.None) return;
+        if (!RecentVisible)
+        {
+            // Down opens it straight away - when the box is empty or all selected, so it doesn't clash with editing.
+            var len = (txtSearch.Text ?? "").Length;
+            var allSelected = Math.Abs(txtSearch.SelectionEnd - txtSearch.SelectionStart) == len;
+            if (e.Key == Key.Down && (len == 0 || allSelected))
+            {
+                _recentTimer.Stop();
+                ShowRecent(_settings.RecentSearches.Take(RecentShown).ToList());
+                e.Handled = RecentVisible;
+            }
+            return;
+        }
+        var count = lstRecent.ItemCount;
+        switch (e.Key)
+        {
+            case Key.Down:
+                lstRecent.SelectedIndex = Math.Min(count - 1, lstRecent.SelectedIndex + 1);
+                e.Handled = true;
+                break;
+            case Key.Up:
+                lstRecent.SelectedIndex = Math.Max(-1, lstRecent.SelectedIndex - 1);
+                e.Handled = true;
+                break;
+            case Key.Enter:
+                if (lstRecent.SelectedItem is string picked)
+                {
+                    FillFromRecent(picked);
+                    e.Handled = true;
+                }
+                else
+                {
+                    HideRecent(); // nothing picked: Enter searches as normal
+                }
+                break;
+            case Key.Escape:
+                HideRecent();
+                e.Handled = true;
+                break;
+        }
+    }
+
+    #endregion
+
     #region Results list
+
+    private static readonly Dictionary<string, string> HeaderTips = new()
+    {
+        { "No", "Part number in this list - stays with the part until the next search, even if rows are removed or sorted.\nWebsite-link rows have no number, so the last # matches Total parts." },
+        { "Supplier", "Who sells it. Blue italic rows are website links for suppliers without an API." },
+        { "SupplierPartNo", "Supplier's own order code - click to open the product page." },
+        { "MfrPartNo", "Manufacturer part number." },
+        { "Manufacturer", "Who makes the part." },
+        { "Type", "Kind of part, in the supplier's own words (its category).\nBlank for website links, and for the odd part a supplier hasn't categorised." },
+        { "Description", "Supplier's description of the part." },
+        { "Stock", "Quantity in stock now. Green = in stock, grey row = none." },
+        { "UnitPrice", "Price each at the lowest price break (usually qty 1)." },
+        { "Currency", "Currency of the prices in this row." },
+        { "PriceBreaks", "Quantity+ unit price, for each price break." },
+        { "MOQ", "Minimum order quantity." },
+        { "Availability", "Stock wording, packaging and lead time from the supplier." },
+        { "Status", "Lifecycle status, e.g. Active, Obsolete, Not recommended for new designs." },
+        { "Datasheet", "Click to open the datasheet. Blank when the supplier didn't give one (TME and website links never do)." }
+    };
+
+    /// <summary>Header tooltips (click a header to sort; drag to reorder; drag the edge to resize).</summary>
+    private void AddColumnHeaderTips()
+    {
+        foreach (var col in gridResults.Columns)
+        {
+            if (col.Tag is not string name || !HeaderTips.TryGetValue(name, out var tip)) continue;
+            // (A Header of "#" doesn't survive the XAML, so the # column's is set here.)
+            var header = new TextBlock { Text = name == "No" ? "#" : col.Header as string ?? "" };
+            ToolTip.SetTip(header, tip + "\nClick to sort.");
+            col.Header = header;
+        }
+    }
+
+    private static string ColumnName(DataGridColumn c) => c.Tag as string ?? "";
+
+    private static string HeaderText(DataGridColumn c) => c.Header as string ?? (c.Header as TextBlock)?.Text ?? "";
+
+    private DataGridColumn Column(string name) => gridResults.Columns.First(c => ColumnName(c) == name);
+
+    private Dictionary<string, ColumnLayout> CurrentColumnLayout()
+    {
+        return gridResults.Columns.ToDictionary(
+            ColumnName,
+            c => new ColumnLayout { Width = (int)(c.ActualWidth > 0 ? c.ActualWidth : c.Width.Value), DisplayIndex = c.DisplayIndex });
+    }
+
+    /// <summary>Restores widths and (drag-and-drop) column order saved by the user.</summary>
+    private void ApplyColumnLayout(Dictionary<string, ColumnLayout>? layout)
+    {
+        if (layout == null || layout.Count == 0) return;
+        var byName = gridResults.Columns.ToDictionary(ColumnName);
+        foreach (var kv in layout)
+        {
+            if (!byName.TryGetValue(kv.Key, out var col)) continue; // column renamed/removed in a later version
+            if (col.CanUserResize) col.Width = new DataGridLength(Math.Max(col.MinWidth, kv.Value.Width));
+        }
+        // The # column always stays first. The rest go after it in their saved order, set lowest first
+        // so each move doesn't disturb the ones already placed.
+        var position = 1;
+        foreach (var kv in layout.Where(x => x.Key != "No").OrderBy(x => x.Value.DisplayIndex))
+        {
+            if (!byName.TryGetValue(kv.Key, out var col)) continue;
+            col.DisplayIndex = Math.Min(position, gridResults.Columns.Count - 1);
+            position++;
+        }
+        // Columns added in a later version than the saved layout go just after the column they follow by default.
+        for (var i = 1; i < gridResults.Columns.Count; i++)
+        {
+            var col = gridResults.Columns[i];
+            if (!layout.ContainsKey(ColumnName(col)))
+                col.DisplayIndex = Math.Min(gridResults.Columns[i - 1].DisplayIndex + 1, gridResults.Columns.Count - 1);
+        }
+        Column("No").DisplayIndex = 0;
+    }
+
+    private void ApplyThumbnailSetting()
+    {
+        var show = _settings.ShowThumbnails;
+        Column("Thumb").IsVisible = show;
+        gridResults.RowHeight = show ? ThumbRowHeight : PlainRowHeight;
+    }
+
+    private static string MpnKey(string? mpn) => (mpn ?? "").Trim().ToUpperInvariant();
+
+    /// <summary>The row's own photo, or one borrowed from another supplier with the same MPN.</summary>
+    private (string Thumb, string Large) ImageUrlsFor(ResultRow row)
+    {
+        var thumb = row.ImageUrl;
+        if (thumb.Length == 0)
+        {
+            if (row.LinkOnly) return ("", "");
+            return _imagesByMpn.TryGetValue(MpnKey(row.MfrPartNo), out var borrowed) ? borrowed : ("", "");
+        }
+        var large = row.LargeImageUrl;
+        return (thumb, large.Length > 0 ? large : thumb);
+    }
+
+    /// <summary>Shows the row's photo, starting its download if need be. Only called for rows on screen.</summary>
+    private void EnsureThumb(ResultRow row)
+    {
+        var url = ImageUrlsFor(row).Thumb;
+        row.ThumbFor = url;
+        row.Thumb = _images.GetThumbnail(url, out var failed);
+        row.NoPhoto = failed;
+    }
+
+    private void Images_ThumbnailReady(string url)
+    {
+        foreach (var r in _rows.Where(r => r.ThumbFor == url))
+        {
+            EnsureThumb(r);
+        }
+    }
+
+    /// <summary>Rows already shown may be able to borrow a photo from rows that just arrived.</summary>
+    private void RefreshThumbs()
+    {
+        if (!_settings.ShowThumbnails) return;
+        foreach (var r in _rows.Where(r => r.ThumbFor != null && r.Thumb == null))
+        {
+            EnsureThumb(r);
+        }
+    }
 
     private ResultRow AddResult(PartResult p, int seq)
     {
@@ -173,6 +514,12 @@ public partial class MainWindow : Window
             // No - given when the search / Load more finishes
         };
         _rows.Add(row);
+
+        var key = MpnKey(p.ManufacturerPartNumber);
+        if (p.ImageUrl.Length > 0 && key.Length > 0 && !_imagesByMpn.ContainsKey(key))
+        {
+            _imagesByMpn[key] = (p.ImageUrl, p.LargeImageUrl.Length > 0 ? p.LargeImageUrl : p.ImageUrl);
+        }
         return row;
     }
 
@@ -232,13 +579,13 @@ public partial class MainWindow : Window
         var removed = RemovedCount();
         var hidden = HiddenNote();
         SetStatus($"{shown} of {total} results shown." +
-                  (removed > 0 ? $" ({removed} removed)" : "") +
+                  (removed > 0 ? $" ({removed} removed - right-click > Restore removed rows to bring them back)" : "") +
                   (hidden.Length > 0 ? " " + hidden : ""));
     }
 
     private int ShowingParts() => _view.Cast<ResultRow>().Count(r => !r.LinkOnly);
 
-    /// <summary>"Total parts = 140", plus "(showing 98)" when Filter / In stock only hide some. Website-link rows don't count.</summary>
+    /// <summary>"Total parts = 140", plus "(showing 98)" when Filter / In stock only / Remove hide some. Website-link rows don't count.</summary>
     private void UpdateTotalParts()
     {
         var parts = _rows.Count(r => !r.LinkOnly);
@@ -248,6 +595,53 @@ public partial class MainWindow : Window
 
     private int RemovedCount() => _rows.Count(r => r.Removed);
 
+    /// <summary>Hides the selected rows until the next search (or Restore).</summary>
+    private void RemoveSelectedRows()
+    {
+        var rows = gridResults.SelectedItems.OfType<ResultRow>().ToList();
+        if (rows.Count == 0) return;
+        foreach (var r in rows)
+        {
+            r.Removed = true;
+        }
+        ApplyFilter();
+    }
+
+    private void RestoreRemovedRows()
+    {
+        foreach (var r in _rows)
+        {
+            r.Removed = false;
+        }
+        ApplyFilter();
+    }
+
+    private static string Field(ResultRow? r, string name)
+    {
+        if (r == null) return "";
+        object? v = name switch
+        {
+            "No" => r.No,
+            "Supplier" => r.Supplier,
+            "SupplierPartNo" => r.SupplierPartNo,
+            "MfrPartNo" => r.MfrPartNo,
+            "Manufacturer" => r.Manufacturer,
+            "Type" => r.Type,
+            "Description" => r.Description,
+            "Stock" => r.Stock,
+            "UnitPrice" => r.UnitPrice,
+            "Currency" => r.Currency,
+            "PriceBreaks" => r.PriceBreaks,
+            "MOQ" => r.Moq,
+            "Availability" => r.Availability,
+            "Datasheet" or "DatasheetUrl" => r.DatasheetUrl,
+            "Status" => r.Status,
+            "ProductUrl" => r.ProductUrl,
+            _ => null
+        };
+        return Convert.ToString(v) ?? "";
+    }
+
     private void GridResults_LoadingRow(object? sender, DataGridRowEventArgs e)
     {
         // Rows are reused while scrolling, so set every class each time.
@@ -255,6 +649,8 @@ public partial class MainWindow : Window
         e.Row.Classes.Set("link", r.LinkOnly);
         e.Row.Classes.Set("nostock", !r.LinkOnly && r.Stock == 0);
         e.Row.Classes.Set("instock", !r.LinkOnly && r.Stock != 0);
+        // Photos are only fetched for rows that come into view.
+        if (_settings.ShowThumbnails) EnsureThumb(r);
     }
 
     private void GridResults_DoubleTapped(object? sender, TappedEventArgs e)
@@ -262,6 +658,16 @@ public partial class MainWindow : Window
         // The link cells already act on a single click; headers aren't rows.
         if (e.Source is not Control c || c.FindAncestorOfType<HyperlinkButton>(includeSelf: true) != null) return;
         if (c.FindAncestorOfType<DataGridRow>(includeSelf: true)?.DataContext is ResultRow r) OpenUrl(r.ProductUrl);
+    }
+
+    private void GridResults_KeyDown(object? sender, KeyEventArgs e)
+    {
+        // Delete (or the Mac's delete key, which is Backspace) removes the selected rows.
+        if ((e.Key == Key.Delete || e.Key == Key.Back) && e.KeyModifiers == KeyModifiers.None)
+        {
+            RemoveSelectedRows();
+            e.Handled = true;
+        }
     }
 
     private void ProductLink_Click(object? sender, RoutedEventArgs e)
@@ -282,6 +688,80 @@ public partial class MainWindow : Window
     private void TxtFilter_TextChanged(object? sender, TextChangedEventArgs e)
     {
         ApplyFilter();
+    }
+
+    // ---- Right-click menu ----
+
+    private ResultRow? _menuRow;
+    private bool _menuOnHeader;
+
+    private void GridResults_PointerPressed(object? sender, PointerPressedEventArgs e)
+    {
+        if (!e.GetCurrentPoint(gridResults).Properties.IsRightButtonPressed) return;
+        var c = e.Source as Control;
+        // The part menu is for rows - not for a right-click on the column headers.
+        _menuOnHeader = c?.FindAncestorOfType<DataGridColumnHeader>(includeSelf: true) != null;
+        _menuRow = c?.FindAncestorOfType<DataGridRow>(includeSelf: true)?.DataContext as ResultRow;
+        // Select the row under the mouse - unless it's already part of a multi-row selection, which is kept (for Remove).
+        if (_menuRow != null && !gridResults.SelectedItems.Contains(_menuRow)) gridResults.SelectedItem = _menuRow;
+    }
+
+    private void CmsResults_Opening(object? sender, CancelEventArgs e)
+    {
+        var row = _menuRow ?? gridResults.SelectedItem as ResultRow;
+        var removed = RemovedCount();
+        // With every row removed there's nothing to click on, but Restore must still be reachable.
+        if (_menuOnHeader || (row == null && removed == 0))
+        {
+            e.Cancel = true;
+            return;
+        }
+        var selectedCount = gridResults.SelectedItems.Count;
+        mnuOpenProduct.IsEnabled = Field(row, "ProductUrl").Length > 0;
+        mnuOpenDatasheet.IsEnabled = Field(row, "DatasheetUrl").Length > 0;
+        mnuCopyMpn.IsEnabled = Field(row, "MfrPartNo").Length > 0;
+        mnuCopySupplierPart.IsEnabled = row != null && row.SupplierPartNo.Length > 0 && !row.LinkOnly;
+        mnuCopyRow.IsEnabled = selectedCount > 0;
+        mnuCopyRow.Header = selectedCount > 1 ? $"Copy {selectedCount} rows" : "Copy row";
+        mnuRemoveRows.IsEnabled = selectedCount > 0;
+        mnuRemoveRows.Header = selectedCount > 1 ? $"Remove {selectedCount} rows from results" : "Remove from results";
+        mnuRestoreRows.IsEnabled = removed > 0;
+        mnuRestoreRows.Header = removed > 0 ? $"Restore removed rows ({removed})" : "Restore removed rows";
+    }
+
+    private ResultRow? MenuRow => _menuRow ?? gridResults.SelectedItem as ResultRow;
+
+    private void MnuOpenProduct_Click(object? sender, RoutedEventArgs e) => OpenUrl(Field(MenuRow, "ProductUrl"));
+
+    private void MnuOpenDatasheet_Click(object? sender, RoutedEventArgs e)
+    {
+        var url = Field(MenuRow, "DatasheetUrl");
+        if (url.StartsWith("//")) url = "https:" + url;
+        OpenUrl(url);
+    }
+
+    private void MnuCopyMpn_Click(object? sender, RoutedEventArgs e) => CopyText(Field(MenuRow, "MfrPartNo"));
+
+    private void MnuCopySupplierPart_Click(object? sender, RoutedEventArgs e) => CopyText(Field(MenuRow, "SupplierPartNo"));
+
+    private void MnuCopyRow_Click(object? sender, RoutedEventArgs e)
+    {
+        // One tab-separated line per selected row, in grid order - pastes straight into Excel or Numbers.
+        var cols = VisibleColumns();
+        var selected = gridResults.SelectedItems.OfType<ResultRow>().ToHashSet();
+        var lines = _view.Cast<ResultRow>().Where(selected.Contains)
+            .Select(r => string.Join("\t", cols.Select(c => Field(r, ColumnName(c)))));
+        CopyText(string.Join(Environment.NewLine, lines));
+    }
+
+    private void MnuRemoveRows_Click(object? sender, RoutedEventArgs e) => RemoveSelectedRows();
+
+    private void MnuRestoreRows_Click(object? sender, RoutedEventArgs e) => RestoreRemovedRows();
+
+    private async void CopyText(string text)
+    {
+        if (text.Length == 0 || Clipboard == null) return;
+        await Clipboard.SetTextAsync(text);
     }
 
     #endregion
@@ -427,8 +907,10 @@ public partial class MainWindow : Window
     private void UpdatePriceHeader()
     {
         var qty = _active?.Quantity ?? 0;
-        var colPrice = gridResults.Columns.First(c => Equals(c.Tag, "UnitPrice"));
-        colPrice.Header = qty > 0 ? $"Price ({qty:#,##0})" : "Price (1)";
+        if (Column("UnitPrice").Header is not TextBlock header) return;
+        header.Text = qty > 0 ? $"Price ({qty:#,##0})" : "Price (1)";
+        ToolTip.SetTip(header, (qty > 0 ? $"Price each when buying {qty:#,##0} (from the price breaks)."
+                                        : "Price each at the lowest price break (usually qty 1).") + "\nClick to sort.");
     }
 
     /// <summary>Where a supplier's results got to, so Load more can fetch the next page.</summary>
@@ -554,12 +1036,14 @@ public partial class MainWindow : Window
                 st.RowCount++;
                 added.Add(AddResult(p, SeqFor(s, st.RowCount)));
             }
+            // Earlier rows (e.g. Mouser) may now be able to borrow a photo from these.
+            RefreshThumbs();
             item.Status = st.RowCount == 0 ? "No matches" : "OK";
             item.Tip = $"{s.Name}: {st.RowCount} result(s)" +
                        (st.Total.HasValue ? $" of {st.Total} found." : ".") +
                        (st.Duplicates > 0 ? $" {st.Duplicates} repeated by {s.Name} and skipped." : "") +
                        (st.Filtered > 0 ? $" {st.Filtered} left out by the Advanced search filters." : "") +
-                       (HasMore(s) ? " Click Load more for the next batch." : "");
+                       (HasMore(s) ? " Right-click > Load more for the next batch." : "");
             if (!firstPage && st.RowCount == before) item.Status = "No more";
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
@@ -662,6 +1146,7 @@ public partial class MainWindow : Window
     private void SetBusy(bool busy)
     {
         _busy = busy;
+        if (busy) HideRecent();
         btnSearch.IsEnabled = !busy;
         btnCancel.IsEnabled = busy;
         btnKeys.IsEnabled = !busy;
@@ -707,6 +1192,43 @@ public partial class MainWindow : Window
         if (e.Row.DataContext is SupplierRow s) e.Row.Classes.Set("unconfigured", !s.Supplier.IsConfigured);
     }
 
+    private SupplierRow? SelectedSupplier => gridSuppliers.SelectedItem as SupplierRow;
+
+    private void GridSuppliers_PointerPressed(object? sender, PointerPressedEventArgs e)
+    {
+        if (!e.GetCurrentPoint(gridSuppliers).Properties.IsRightButtonPressed) return;
+        if ((e.Source as Control)?.FindAncestorOfType<DataGridRow>(includeSelf: true)?.DataContext is SupplierRow s)
+            gridSuppliers.SelectedItem = s;
+    }
+
+    private void CmsSuppliers_Opening(object? sender, CancelEventArgs e)
+    {
+        var hasQuery = (txtSearch.Text ?? "").Trim().Length > 0;
+        var s = SelectedSupplier?.Supplier;
+        mnuOpenSupplierSearch.IsEnabled = hasQuery && s != null;
+        mnuOpenAllSearches.IsEnabled = hasQuery;
+        mnuLoadMoreSupplier.IsEnabled = s != null && !_busy && HasMore(s);
+        mnuLoadMoreSupplier.Header = s == null ? "Load more" : $"Load {MaxPerSupplier} more from {s.Name}";
+    }
+
+    private async void MnuLoadMoreSupplier_Click(object? sender, RoutedEventArgs e)
+    {
+        if (SelectedSupplier is { } item) await LoadMoreAsync(new List<SupplierRow> { item });
+    }
+
+    private void MnuOpenSupplierSearch_Click(object? sender, RoutedEventArgs e)
+    {
+        if (SelectedSupplier is { } item) OpenUrl(item.Supplier.GetSearchUrl((txtSearch.Text ?? "").Trim()));
+    }
+
+    private void MnuOpenAllSearches_Click(object? sender, RoutedEventArgs e)
+    {
+        foreach (var item in _supplierRows.Where(i => i.IsChecked))
+        {
+            OpenUrl(item.Supplier.GetSearchUrl((txtSearch.Text ?? "").Trim()));
+        }
+    }
+
     /// <summary>Double-click a supplier: open the search on its website.</summary>
     private void GridSuppliers_DoubleTapped(object? sender, TappedEventArgs e)
     {
@@ -717,7 +1239,7 @@ public partial class MainWindow : Window
 
     #endregion
 
-    #region Keys / links
+    #region Keys / export / links
 
     private async void BtnKeys_Click(object? sender, RoutedEventArgs e)
     {
@@ -725,6 +1247,59 @@ public partial class MainWindow : Window
         if (!saved) return;
         RebuildSuppliers();
         SetStatus("API keys saved.");
+    }
+
+    private List<DataGridColumn> VisibleColumns()
+    {
+        return gridResults.Columns.Where(c => c.IsVisible && ColumnName(c) != "Thumb")
+                                  .OrderBy(c => c.DisplayIndex).ToList();
+    }
+
+    private async void BtnExport_Click(object? sender, RoutedEventArgs e)
+    {
+        if (_view.Count == 0)
+        {
+            await MessageBox.Show(this, "Nothing to export yet.", Title ?? "");
+            return;
+        }
+        var safeName = string.Concat((txtSearch.Text ?? "").Trim().Split(Path.GetInvalidFileNameChars()));
+        var file = await StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
+        {
+            Title = "Export CSV",
+            SuggestedFileName = $"MacPartsFinder {safeName} {DateTime.Now:yyyy-MM-dd HHmm}.csv",
+            DefaultExtension = "csv",
+            FileTypeChoices = new[] { new FilePickerFileType("CSV file") { Patterns = new[] { "*.csv" } } }
+        });
+        if (file == null) return;
+
+        // The Datasheet column is the URL itself; it goes at the end as "Datasheet URL" instead.
+        var cols = VisibleColumns().Where(c => ColumnName(c) != "Datasheet").ToList();
+        var names = cols.Select(ColumnName).Concat(new[] { "ProductUrl", "DatasheetUrl" }).ToList();
+        var headers = cols.Select(HeaderText).Concat(new[] { "Product URL", "Datasheet URL" });
+        var sb = new StringBuilder();
+        sb.AppendLine(string.Join(",", headers.Select(CsvQuote)));
+        foreach (var row in _view.Cast<ResultRow>())
+        {
+            sb.AppendLine(string.Join(",", names.Select(n => CsvQuote(Field(row, n)))));
+        }
+        try
+        {
+            await using var stream = await file.OpenWriteAsync();
+            if (stream.CanSeek) stream.SetLength(0);
+            await using var writer = new StreamWriter(stream, new UTF8Encoding(true)); // BOM so Excel shows £ properly
+            await writer.WriteAsync(sb.ToString());
+            SetStatus("Exported to " + (file.TryGetLocalPath() ?? file.Name));
+        }
+        catch (Exception ex)
+        {
+            await MessageBox.Show(this, "Export failed: " + ex.Message, Title ?? "");
+        }
+    }
+
+    private static string CsvQuote(string s)
+    {
+        if (s.IndexOfAny(new[] { ',', '"', '\r', '\n' }) >= 0) return "\"" + s.Replace("\"", "\"\"") + "\"";
+        return s;
     }
 
     private async void OpenUrl(string url)

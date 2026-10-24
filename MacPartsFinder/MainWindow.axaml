@@ -7,12 +7,17 @@
         Title="MacPartsFinder">
 
     <Window.Styles>
-        <Style Selector="WrapPanel#toolbar > :is(Control)">
-            <Setter Property="Margin" Value="0,2,6,2" />
+        <Style Selector="DockPanel#toolbar > :is(Control), WrapPanel#toolbarLeft > :is(Control)">
+            <Setter Property="Margin" Value="0,2,4,2" />
             <Setter Property="VerticalAlignment" Value="Center" />
         </Style>
-        <Style Selector="DataGrid">
-            <Setter Property="FontSize" Value="12" />
+        <Style Selector="DockPanel#toolbar Button">
+            <Setter Property="Padding" Value="8,3" />
+            <Setter Property="HorizontalContentAlignment" Value="Center" />
+        </Style>
+        <Style Selector="NumericUpDown#nudMax TextBox">
+            <Setter Property="MinWidth" Value="0" />
+            <Setter Property="Padding" Value="6,2,2,2" />
         </Style>
         <Style Selector="DataGridCell.right">
             <Setter Property="HorizontalContentAlignment" Value="Right" />
@@ -20,57 +25,81 @@
         <Style Selector="HyperlinkButton">
             <Setter Property="Padding" Value="0" />
             <Setter Property="FontSize" Value="12" />
+            <Setter Property="VerticalAlignment" Value="Center" />
         </Style>
 
         <!-- Results colours, as in WinPartsFinder: website-link rows blue italic, no stock grey, stock green, # quieter -->
         <Style Selector="DataGridCell.muted">
-            <Setter Property="Foreground" Value="#6D6D6D" />
+            <Setter Property="Foreground" Value="{DynamicResource MutedTextBrush}" />
         </Style>
         <Style Selector="DataGridRow.link DataGridCell">
-            <Setter Property="Foreground" Value="RoyalBlue" />
+            <Setter Property="Foreground" Value="{DynamicResource LinkTextBrush}" />
             <Setter Property="FontStyle" Value="Italic" />
         </Style>
         <Style Selector="DataGridRow.nostock DataGridCell">
-            <Setter Property="Foreground" Value="#6D6D6D" />
+            <Setter Property="Foreground" Value="{DynamicResource MutedTextBrush}" />
         </Style>
         <Style Selector="DataGridRow.instock DataGridCell.stock">
-            <Setter Property="Foreground" Value="DarkGreen" />
+            <Setter Property="Foreground" Value="{DynamicResource GoodTextBrush}" />
         </Style>
 
         <!-- Supplier list: suppliers with no key are greyed; the tooltip says how the search went -->
         <Style Selector="DataGridRow.unconfigured DataGridCell">
-            <Setter Property="Foreground" Value="#6D6D6D" />
+            <Setter Property="Foreground" Value="{DynamicResource MutedTextBrush}" />
         </Style>
         <Style Selector="DataGrid#gridSuppliers DataGridRow" x:DataType="local:SupplierRow">
             <Setter Property="ToolTip.Tip" Value="{Binding Tip}" />
         </Style>
+        <Style Selector="DataGrid#gridSuppliers CheckBox">
+            <Setter Property="MinHeight" Value="0" />
+            <Setter Property="Foreground" Value="{Binding $parent[DataGridCell].Foreground}" />
+        </Style>
+
+        <!-- Recent searches list: never takes the keyboard from the Search box -->
+        <Style Selector="ListBox#lstRecent ListBoxItem">
+            <Setter Property="Focusable" Value="False" />
+            <Setter Property="Padding" Value="6,2" />
+            <Setter Property="MinHeight" Value="0" />
+        </Style>
     </Window.Styles>
 
     <DockPanel>
-        <!-- Toolbar -->
-        <WrapPanel x:Name="toolbar" DockPanel.Dock="Top" Margin="8,6,8,4">
-            <TextBlock Text="Search:" />
-            <TextBox x:Name="txtSearch" Width="240"
-                     ToolTip.Tip="Part number or keywords to search for, e.g. LM358 or 10uF 25V 0805.&#10;Press Enter to search." />
-            <ComboBox x:Name="cboMode" Width="180"
-                      ToolTip.Tip="Keyword: searches descriptions and part numbers.&#10;Manufacturer part no.: looks for parts whose manufacturer part number starts with what you typed." />
-            <TextBlock Text="Max/supp.:" />
-            <NumericUpDown x:Name="nudMax" Width="110" Minimum="1" Maximum="50" Increment="1" FormatString="0"
-                           ToolTip.Tip="How many results to fetch from each supplier per search, and per Load more (up to 50).&#10;Fewer is faster. Each search or Load more uses one call of each supplier's daily API allowance." />
-            <Button x:Name="btnSearch" Content="Search" IsDefault="True" Click="BtnSearch_Click"
-                    ToolTip.Tip="Search every ticked supplier at once (Enter)." />
-            <Button x:Name="btnCancel" Content="Cancel" IsEnabled="False" Click="BtnCancel_Click"
-                    ToolTip.Tip="Stop any searches still running." />
-            <Button x:Name="btnLoadMore" Content="Load more" IsEnabled="False" Click="BtnLoadMore_Click"
-                    ToolTip.Tip="Fetch the next batch (Max/supp.) from every ticked supplier that has more - see Hits, e.g. 50 / 312.&#10;Uses one API call per supplier. New rows are added at the end and selected - click the Supplier header to group them." />
-            <CheckBox x:Name="chkInStock" Content="In stock only" IsCheckedChanged="ChkInStock_Changed"
-                      ToolTip.Tip="Hide parts with no stock. Website-link rows always stay." />
-            <TextBlock Text="Filter:" />
-            <TextBox x:Name="txtFilter" Width="150" PlaceholderText="narrow results…" TextChanged="TxtFilter_TextChanged"
-                     ToolTip.Tip="Narrow the current results as you type.&#10;Matches supplier, supplier part no., mfr part no., manufacturer, type and description." />
-            <Button x:Name="btnKeys" Content="API keys (test)…" Click="BtnKeys_Click"
-                    ToolTip.Tip="Temporary, for testing: enter your own API keys. The full Settings window replaces this later." />
-        </WrapPanel>
+        <!-- Toolbar: same order as WinPartsFinder -->
+        <DockPanel x:Name="toolbar" DockPanel.Dock="Top" Margin="6,4,6,2">
+            <WrapPanel x:Name="toolbarLeft">
+                <TextBlock Text="Search:" />
+                <TextBox x:Name="txtSearch" Width="190"
+                         ToolTip.Tip="Part number or keywords to search for, e.g. LM358 or 10uF 25V 0805.&#10;Press Enter to search. Click in the box and pause to see your last 20 searches; matching ones are also suggested as you type." />
+                <ComboBox x:Name="cboMode" Width="145"
+                          ToolTip.Tip="Keyword: searches descriptions and part numbers.&#10;Manufacturer part no.: looks for parts whose manufacturer part number starts with what you typed." />
+                <TextBlock Text="Max/supp.:" />
+                <NumericUpDown x:Name="nudMax" Width="92" Minimum="1" Maximum="50" Increment="1" FormatString="0"
+                               ToolTip.Tip="How many results to fetch from each supplier per search, and per Load more (up to 50).&#10;Fewer is faster. Each search or Load more uses one call of each supplier's daily API allowance." />
+                <Button x:Name="btnSearch" Content="Search" IsDefault="True" Click="BtnSearch_Click"
+                        ToolTip.Tip="Search every ticked supplier at once (Enter)." />
+                <Button x:Name="btnCancel" Content="Cancel" IsEnabled="False" Click="BtnCancel_Click"
+                        ToolTip.Tip="Stop any searches still running." />
+                <Button x:Name="btnLoadMore" Content="Load more" IsEnabled="False" Click="BtnLoadMore_Click"
+                        ToolTip.Tip="Fetch the next batch (Max/supp.) from every ticked supplier that has more - see Hits, e.g. 50 / 312.&#10;Uses one API call per supplier. New rows are added at the end and selected - click the Supplier header to group them.&#10;Right-click a supplier to load more from just that one." />
+                <CheckBox x:Name="chkInStock" Content="In stock only" IsCheckedChanged="ChkInStock_Changed"
+                          ToolTip.Tip="Hide parts with no stock. Website-link rows always stay." />
+                <TextBlock Text="Filter:" />
+                <TextBox x:Name="txtFilter" Width="120" PlaceholderText="narrow results…" TextChanged="TxtFilter_TextChanged"
+                         ToolTip.Tip="Narrow the current results as you type.&#10;Matches supplier, supplier part no., mfr part no., manufacturer and description." />
+                <Button x:Name="btnExport" Content="Export CSV…" Click="BtnExport_Click"
+                        ToolTip.Tip="Save the rows currently shown to a CSV file (opens in Excel or Numbers)." />
+                <Button x:Name="btnKeys" Content="API keys…" Click="BtnKeys_Click"
+                        ToolTip.Tip="Temporary, for testing: enter your own API keys. The full Settings window replaces this later." />
+            </WrapPanel>
+
+            <!-- Recent searches / suggestions, dropped down under the Search box (placed in code) -->
+            <Popup x:Name="popRecent" Placement="BottomEdgeAlignedLeft" IsLightDismissEnabled="False">
+                <Border BorderBrush="Gray" BorderThickness="1">
+                    <ListBox x:Name="lstRecent" Focusable="False" MaxHeight="420"
+                             Tapped="LstRecent_Tapped" PointerMoved="LstRecent_PointerMoved" />
+                </Border>
+            </Popup>
+        </DockPanel>
 
         <!-- Status bar -->
         <DockPanel DockPanel.Dock="Bottom" Margin="8,3,8,4">
@@ -78,22 +107,32 @@
             <TextBlock x:Name="lblStatus" Text="Ready" TextTrimming="CharacterEllipsis" />
         </DockPanel>
 
-        <Grid ColumnDefinitions="440,5,*">
+        <Grid x:Name="gridMain" ColumnDefinitions="440,5,*">
             <!-- Supplier list -->
             <DataGrid x:Name="gridSuppliers" Grid.Column="0" IsReadOnly="True" CanUserSortColumns="False"
-                      SelectionMode="Single" HeadersVisibility="Column" GridLinesVisibility="Horizontal"
+                      SelectionMode="Single" HeadersVisibility="Column" GridLinesVisibility="Horizontal" RowHeight="24"
                       LoadingRow="GridSuppliers_LoadingRow" DoubleTapped="GridSuppliers_DoubleTapped">
+                <DataGrid.ContextMenu>
+                    <ContextMenu x:Name="cmsSuppliers" Opening="CmsSuppliers_Opening">
+                        <MenuItem x:Name="mnuLoadMoreSupplier" Header="Load more" Click="MnuLoadMoreSupplier_Click" />
+                        <Separator />
+                        <MenuItem x:Name="mnuOpenSupplierSearch" Header="Open search on this supplier's website" Click="MnuOpenSupplierSearch_Click" />
+                        <MenuItem x:Name="mnuOpenAllSearches" Header="Open search on all ticked websites" Click="MnuOpenAllSearches_Click" />
+                    </ContextMenu>
+                </DataGrid.ContextMenu>
                 <DataGrid.Columns>
-                    <DataGridTemplateColumn Header="Supplier" Width="140">
+                    <DataGridTemplateColumn Header="Supplier" Width="130">
                         <DataGridTemplateColumn.CellTemplate>
                             <DataTemplate x:DataType="local:SupplierRow">
-                                <CheckBox IsChecked="{Binding IsChecked}" Content="{Binding Name}" Margin="8,0,0,0" FontSize="12" />
+                                <CheckBox IsChecked="{Binding IsChecked}" Margin="6,0,0,0">
+                                    <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
+                                </CheckBox>
                             </DataTemplate>
                         </DataGridTemplateColumn.CellTemplate>
                     </DataGridTemplateColumn>
-                    <DataGridTextColumn Header="Mode" Binding="{Binding ModeText}" x:DataType="local:SupplierRow" Width="90" />
-                    <DataGridTextColumn Header="Status" Binding="{Binding Status}" x:DataType="local:SupplierRow" Width="90" />
-                    <DataGridTextColumn Header="Hits" Binding="{Binding Hits}" x:DataType="local:SupplierRow" Width="70" CellStyleClasses="right" />
+                    <DataGridTextColumn Header="Mode" Binding="{Binding ModeText}" x:DataType="local:SupplierRow" Width="98" />
+                    <DataGridTextColumn Header="Status" Binding="{Binding Status}" x:DataType="local:SupplierRow" Width="76" />
+                    <DataGridTextColumn Header="Hits" Binding="{Binding Hits}" x:DataType="local:SupplierRow" Width="60" CellStyleClasses="right" />
                     <DataGridTextColumn Header="Time" Binding="{Binding Time}" x:DataType="local:SupplierRow" Width="*" />
                 </DataGrid.Columns>
             </DataGrid>
@@ -104,13 +143,40 @@
             <DataGrid x:Name="gridResults" Grid.Column="2" IsReadOnly="True" SelectionMode="Extended"
                       CanUserReorderColumns="True" CanUserResizeColumns="True" CanUserSortColumns="True"
                       FrozenColumnCount="1" HeadersVisibility="Column" GridLinesVisibility="All"
-                      LoadingRow="GridResults_LoadingRow" DoubleTapped="GridResults_DoubleTapped">
+                      LoadingRow="GridResults_LoadingRow" DoubleTapped="GridResults_DoubleTapped" KeyDown="GridResults_KeyDown">
+                <DataGrid.ContextMenu>
+                    <ContextMenu x:Name="cmsResults" Opening="CmsResults_Opening">
+                        <MenuItem x:Name="mnuOpenProduct" Header="Open product page" Click="MnuOpenProduct_Click" />
+                        <MenuItem x:Name="mnuOpenDatasheet" Header="Open datasheet" Click="MnuOpenDatasheet_Click" />
+                        <Separator />
+                        <MenuItem x:Name="mnuCopyMpn" Header="Copy manufacturer part no." Click="MnuCopyMpn_Click" />
+                        <MenuItem x:Name="mnuCopySupplierPart" Header="Copy supplier part no." Click="MnuCopySupplierPart_Click" />
+                        <MenuItem x:Name="mnuCopyRow" Header="Copy row" Click="MnuCopyRow_Click" />
+                        <Separator />
+                        <MenuItem x:Name="mnuRemoveRows" Header="Remove from results" InputGesture="Delete" Click="MnuRemoveRows_Click" />
+                        <MenuItem x:Name="mnuRestoreRows" Header="Restore removed rows" Click="MnuRestoreRows_Click" />
+                    </ContextMenu>
+                </DataGrid.ContextMenu>
                 <DataGrid.Columns>
-                    <DataGridTextColumn Header="#" Binding="{Binding No}" x:DataType="local:ResultRow" Width="42"
+                    <DataGridTextColumn Tag="No" Header="#" Binding="{Binding No}" x:DataType="local:ResultRow" Width="42"
                                         CellStyleClasses="right muted" CanUserReorder="False" />
-                    <DataGridTextColumn Header="Supplier" Binding="{Binding Supplier}" x:DataType="local:ResultRow" Width="90"
+                    <DataGridTemplateColumn Tag="Thumb" Header="" Width="43" CanUserSort="False" CanUserResize="False">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate x:DataType="local:ResultRow">
+                                <Border Width="35" Height="35" Background="White" BorderBrush="Silver" BorderThickness="1"
+                                        HorizontalAlignment="Center" VerticalAlignment="Center">
+                                    <Panel>
+                                        <Image Source="{Binding Thumb}" Margin="1" Stretch="Uniform" />
+                                        <Path IsVisible="{Binding NoPhoto}" Data="M 8,8 L 25,25 M 25,8 L 8,25"
+                                              Stroke="LightGray" StrokeThickness="1.5" />
+                                    </Panel>
+                                </Border>
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
+                    <DataGridTextColumn Tag="Supplier" Header="Supplier" Binding="{Binding Supplier}" x:DataType="local:ResultRow" Width="90"
                                         SortMemberPath="Seq" />
-                    <DataGridTemplateColumn Header="Supplier part no." Width="110" SortMemberPath="SupplierPartNo">
+                    <DataGridTemplateColumn Tag="SupplierPartNo" Header="Supplier part no." Width="104" SortMemberPath="SupplierPartNo">
                         <DataGridTemplateColumn.CellTemplate>
                             <DataTemplate x:DataType="local:ResultRow">
                                 <HyperlinkButton Content="{Binding SupplierPartText}" IsVisible="{Binding HasProductLink}"
@@ -118,19 +184,19 @@
                             </DataTemplate>
                         </DataGridTemplateColumn.CellTemplate>
                     </DataGridTemplateColumn>
-                    <DataGridTextColumn Header="Mfr part no." Binding="{Binding MfrPartNo}" x:DataType="local:ResultRow" Width="140" />
-                    <DataGridTextColumn Header="Manufacturer" Binding="{Binding Manufacturer}" x:DataType="local:ResultRow" Width="110" />
-                    <DataGridTextColumn Header="Type" Binding="{Binding Type}" x:DataType="local:ResultRow" Width="160" />
-                    <DataGridTextColumn Header="Description" Binding="{Binding Description}" x:DataType="local:ResultRow" Width="280" />
-                    <DataGridTextColumn Header="Stock" Binding="{Binding Stock, StringFormat='{}{0:#,##0}'}" x:DataType="local:ResultRow"
-                                        Width="60" CellStyleClasses="right stock" />
+                    <DataGridTextColumn Tag="MfrPartNo" Header="Mfr part no." Binding="{Binding MfrPartNo}" x:DataType="local:ResultRow" Width="140" />
+                    <DataGridTextColumn Tag="Manufacturer" Header="Manufacturer" Binding="{Binding Manufacturer}" x:DataType="local:ResultRow" Width="110" />
+                    <DataGridTextColumn Tag="Type" Header="Type" Binding="{Binding Type}" x:DataType="local:ResultRow" Width="160" />
+                    <DataGridTextColumn Tag="Description" Header="Description" Binding="{Binding Description}" x:DataType="local:ResultRow" Width="280" />
+                    <DataGridTextColumn Tag="Stock" Header="Stock" Binding="{Binding Stock, StringFormat='{}{0:#,##0}'}" x:DataType="local:ResultRow"
+                                        Width="55" CellStyleClasses="right stock" />
                     <DataGridTextColumn Tag="UnitPrice" Header="Price (1)" Binding="{Binding UnitPrice, StringFormat='{}{0:#,##0.00##}'}"
-                                        x:DataType="local:ResultRow" Width="70" CellStyleClasses="right" />
-                    <DataGridTextColumn Header="Cur" Binding="{Binding Currency}" x:DataType="local:ResultRow" Width="45" />
-                    <DataGridTextColumn Header="Price breaks" Binding="{Binding PriceBreaks}" x:DataType="local:ResultRow" Width="220" />
-                    <DataGridTextColumn Header="MOQ" Binding="{Binding Moq}" x:DataType="local:ResultRow" Width="50" CellStyleClasses="right" />
-                    <DataGridTextColumn Header="Availability / lead" Binding="{Binding Availability}" x:DataType="local:ResultRow" Width="110" />
-                    <DataGridTemplateColumn Header="Datasheet" Width="80" SortMemberPath="DatasheetUrl">
+                                        x:DataType="local:ResultRow" Width="64" CellStyleClasses="right" />
+                    <DataGridTextColumn Tag="Currency" Header="Cur" Binding="{Binding Currency}" x:DataType="local:ResultRow" Width="42" />
+                    <DataGridTextColumn Tag="PriceBreaks" Header="Price breaks" Binding="{Binding PriceBreaks}" x:DataType="local:ResultRow" Width="220" />
+                    <DataGridTextColumn Tag="MOQ" Header="MOQ" Binding="{Binding Moq}" x:DataType="local:ResultRow" Width="48" CellStyleClasses="right" />
+                    <DataGridTextColumn Tag="Availability" Header="Availability / lead" Binding="{Binding Availability}" x:DataType="local:ResultRow" Width="110" />
+                    <DataGridTemplateColumn Tag="Datasheet" Header="Datasheet" Width="75" SortMemberPath="DatasheetUrl">
                         <DataGridTemplateColumn.CellTemplate>
                             <DataTemplate x:DataType="local:ResultRow">
                                 <HyperlinkButton Content="Datasheet" IsVisible="{Binding HasDatasheet}" Click="DatasheetLink_Click"
@@ -138,7 +204,7 @@
                             </DataTemplate>
                         </DataGridTemplateColumn.CellTemplate>
                     </DataGridTemplateColumn>
-                    <DataGridTextColumn Header="Status" Binding="{Binding Status}" x:DataType="local:ResultRow" Width="70" />
+                    <DataGridTextColumn Tag="Status" Header="Status" Binding="{Binding Status}" x:DataType="local:ResultRow" Width="60" />
                 </DataGrid.Columns>
             </DataGrid>
         </Grid>

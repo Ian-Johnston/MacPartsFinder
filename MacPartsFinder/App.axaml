@@ -2,10 +2,67 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              x:Class="MacPartsFinder.App"
              RequestedThemeVariant="Light">
-             <!-- Light for now; Dark mode (a setting, like WinPartsFinder) comes with the rest of the main window. -->
+             <!-- Light or Dark is set from the Dark mode setting when the main window opens. -->
+
+    <Application.Resources>
+        <ResourceDictionary>
+            <!-- Results colours, as in WinPartsFinder (Theme.vb) -->
+            <ResourceDictionary.ThemeDictionaries>
+                <ResourceDictionary x:Key="Light">
+                    <SolidColorBrush x:Key="LinkTextBrush" Color="RoyalBlue" />
+                    <SolidColorBrush x:Key="MutedTextBrush" Color="#6D6D6D" />
+                    <SolidColorBrush x:Key="GoodTextBrush" Color="DarkGreen" />
+                </ResourceDictionary>
+                <ResourceDictionary x:Key="Dark">
+                    <SolidColorBrush x:Key="LinkTextBrush" Color="#6EAFFF" />
+                    <SolidColorBrush x:Key="MutedTextBrush" Color="#969696" />
+                    <SolidColorBrush x:Key="GoodTextBrush" Color="#6ECD78" />
+                </ResourceDictionary>
+            </ResourceDictionary.ThemeDictionaries>
+            <!-- 12px text throughout, like WinPartsFinder's 9pt Segoe UI (Fluent's default is 14px) -->
+            <x:Double x:Key="ControlContentThemeFontSize">12</x:Double>
+        </ResourceDictionary>
+    </Application.Resources>
 
     <Application.Styles>
-        <FluentTheme />
+        <!-- Compact: smaller controls, closer to the Windows Forms layout -->
+        <FluentTheme DensityStyle="Compact" />
         <StyleInclude Source="avares://Avalonia.Controls.DataGrid/Themes/Fluent.xaml" />
+        <Style Selector="Window">
+            <Setter Property="FontSize" Value="12" />
+        </Style>
+        <Style Selector="DataGridCell, DataGridColumnHeader">
+            <Setter Property="FontSize" Value="12" />
+        </Style>
+        <!-- Slimmer column headers: the standard ones keep 32px free for the sort arrow even when a column isn't
+             sorted, which hides the header text of narrow columns like # and Hits. -->
+        <Style Selector="DataGridColumnHeader">
+            <Setter Property="MinHeight" Value="24" />
+            <Setter Property="Padding" Value="6,2" />
+            <Setter Property="Template">
+                <ControlTemplate>
+                    <Panel Background="{TemplateBinding Background}">
+                        <Grid ColumnDefinitions="*,Auto" Margin="{TemplateBinding Padding}">
+                            <ContentPresenter Content="{TemplateBinding Content}"
+                                              ContentTemplate="{TemplateBinding ContentTemplate}"
+                                              HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                              VerticalAlignment="{TemplateBinding VerticalContentAlignment}" />
+                            <Path Name="SortIcon" Grid.Column="1" IsVisible="False" Width="8" Height="5" Margin="4,0,0,0"
+                                  Stretch="Fill" VerticalAlignment="Center" Fill="{TemplateBinding Foreground}" />
+                        </Grid>
+                        <Rectangle Width="1" HorizontalAlignment="Right" Fill="{TemplateBinding SeparatorBrush}"
+                                   IsVisible="{TemplateBinding AreSeparatorsVisible}" />
+                    </Panel>
+                </ControlTemplate>
+            </Setter>
+        </Style>
+        <Style Selector="DataGridColumnHeader:sortascending /template/ Path#SortIcon">
+            <Setter Property="IsVisible" Value="True" />
+            <Setter Property="Data" Value="M 0,5 L 4,0 L 8,5 Z" />
+        </Style>
+        <Style Selector="DataGridColumnHeader:sortdescending /template/ Path#SortIcon">
+            <Setter Property="IsVisible" Value="True" />
+            <Setter Property="Data" Value="M 0,0 L 8,0 L 4,5 Z" />
+        </Style>
     </Application.Styles>
 </Application>

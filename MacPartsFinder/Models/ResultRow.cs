@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using Avalonia.Media.Imaging;
 
 namespace MacPartsFinder;
 
@@ -53,4 +54,32 @@ public sealed class ResultRow : INotifyPropertyChanged
 
     public bool HasProductLink => SupplierPartText.Length > 0 && ProductUrl.Length > 0;
     public bool HasDatasheet => DatasheetUrl.Length > 0;
+
+    // ---- Photo column (set by the main window as thumbnails arrive) ----
+
+    private Bitmap? _thumb;
+    public Bitmap? Thumb
+    {
+        get => _thumb;
+        set
+        {
+            _thumb = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Thumb)));
+        }
+    }
+
+    private bool _noPhoto;
+    /// <summary>True shows the "no image" cross; false with no Thumb is the empty "loading" box.</summary>
+    public bool NoPhoto
+    {
+        get => _noPhoto;
+        set
+        {
+            _noPhoto = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(NoPhoto)));
+        }
+    }
+
+    /// <summary>The photo URL Thumb / NoPhoto currently show ("" = none); null until the row is first shown.</summary>
+    public string? ThumbFor { get; set; }
 }
