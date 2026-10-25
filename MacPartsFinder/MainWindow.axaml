@@ -15,6 +15,12 @@
             <Setter Property="Padding" Value="8,3" />
             <Setter Property="HorizontalContentAlignment" Value="Center" />
         </Style>
+        <!-- Tick boxes: each label close to its own box, and clear space before the next box, so it's obvious which goes with which -->
+        <Style Selector="WrapPanel#toolbarLeft > CheckBox">
+            <Setter Property="Margin" Value="8,2,6,2" />
+            <Setter Property="Padding" Value="5,0,0,0" />
+            <Setter Property="MinWidth" Value="0" />
+        </Style>
         <Style Selector="NumericUpDown#nudMax TextBox">
             <Setter Property="MinWidth" Value="0" />
             <Setter Property="Padding" Value="6,2,2,2" />
@@ -41,6 +47,14 @@
         </Style>
         <Style Selector="DataGridRow.instock DataGridCell.stock">
             <Setter Property="Foreground" Value="{DynamicResource GoodTextBrush}" />
+        </Style>
+        <!-- "Prices in GBP": converted prices (Price, Cur, Price breaks) in their own colour, so they read as estimates;
+             hover for the supplier's own price and the rate used -->
+        <Style Selector="DataGridRow.conv DataGridCell.price">
+            <Setter Property="Foreground" Value="{DynamicResource ConvertedTextBrush}" />
+        </Style>
+        <Style Selector="DataGrid#gridResults DataGridCell.price" x:DataType="local:ResultRow">
+            <Setter Property="ToolTip.Tip" Value="{Binding PriceTip}" />
         </Style>
 
         <!-- Supplier list: suppliers with no key are greyed; the tooltip says how the search went -->
@@ -94,7 +108,7 @@
             <WrapPanel x:Name="toolbarLeft">
                 <TextBlock Text="Search:" />
                 <ComboBox x:Name="cboSearch" Width="190" IsEditable="True" MaxDropDownHeight="520"
-                          ToolTip.Tip="Part number or keywords to search for, e.g. LM358 or 10uF 25V 0805. Press Return to search.&#10;Click the arrow (or press ⌥↓) to pick one of your last 30 searches; matching ones are also suggested as you type." />
+                          ToolTip.Tip="Part number or keywords to search for. Press Return to search.&#10;Click the arrow (or press ⌥↓) to pick one of your last 30 searches; matching ones are also suggested as you type." />
                 <ComboBox x:Name="cboMode" Width="145"
                           ToolTip.Tip="Keyword: searches descriptions and part numbers.&#10;Manufacturer part no.: looks for parts whose manufacturer part number starts with what you typed." />
                 <TextBlock Text="Max/supp.:" />
@@ -110,7 +124,10 @@
                         ToolTip.Tip="Fetch the next batch (Max/supp.) from every ticked supplier that has more - see Hits, e.g. 50 / 312.&#10;Uses one API call per supplier. New rows are added at the end and selected - click the Supplier header to group them.&#10;Right-click a supplier to load more from just that one." />
                 <CheckBox x:Name="chkInStock" Content="In stock only" IsCheckedChanged="ChkInStock_Changed"
                           ToolTip.Tip="Hide parts with no stock. Website-link rows always stay." />
-                <Button x:Name="btnTypes" Content="Types…" IsEnabled="False" Click="BtnTypes_Click"
+                <!-- Text set in code: "Prices in GBP" etc. -->
+                <CheckBox x:Name="chkConvert" Content="Prices in GBP" IsCheckedChanged="ChkConvert_Changed"
+                          ToolTip.Tip="Show every price in one currency (choose it in Settings), using the European Central Bank's daily exchange rates.&#10;Converted prices are purple - hover over one to see the supplier's own price. They're approximate.&#10;Rates are fetched at most every 12 hours." />
+                <Button x:Name="btnTypes" Content="Types…" IsEnabled="False" Click="BtnTypes_Click" Margin="8,2,4,2"
                         ToolTip.Tip="After a search: tick or untick part types (categories) to show or hide them,&#10;e.g. hide Evaluation Kit and Flip-Flops. A new search shows every type again." />
                 <TextBlock Text="Filter:" />
                 <TextBox x:Name="txtFilter" Width="120" PlaceholderText="narrow results…" TextChanged="TxtFilter_TextChanged"
@@ -228,10 +245,12 @@
                     <DataGridTextColumn Tag="Stock" Header="Stock" Binding="{Binding Stock, StringFormat='{}{0:#,##0}'}" x:DataType="local:ResultRow"
                                         Width="55" CellStyleClasses="right stock" />
                     <DataGridTextColumn Tag="UnitPrice" Header="Price (1)" Binding="{Binding UnitPrice, StringFormat='{}{0:#,##0.00##}'}"
-                                        x:DataType="local:ResultRow" Width="64" CellStyleClasses="right" />
+                                        x:DataType="local:ResultRow" Width="64" CellStyleClasses="right price" />
                     <!-- MinWidth also widens a narrower width saved by an earlier version, so GBP etc. show in full -->
-                    <DataGridTextColumn Tag="Currency" Header="Cur" Binding="{Binding Currency}" x:DataType="local:ResultRow" Width="52" MinWidth="50" />
-                    <DataGridTextColumn Tag="PriceBreaks" Header="Price breaks" Binding="{Binding PriceBreaks}" x:DataType="local:ResultRow" Width="220" />
+                    <DataGridTextColumn Tag="Currency" Header="Cur" Binding="{Binding Currency}" x:DataType="local:ResultRow" Width="52" MinWidth="50"
+                                        CellStyleClasses="price" />
+                    <DataGridTextColumn Tag="PriceBreaks" Header="Price breaks" Binding="{Binding PriceBreaks}" x:DataType="local:ResultRow" Width="220"
+                                        CellStyleClasses="price" />
                     <DataGridTextColumn Tag="MOQ" Header="MOQ" Binding="{Binding Moq}" x:DataType="local:ResultRow" Width="48" CellStyleClasses="right" />
                     <DataGridTextColumn Tag="Availability" Header="Availability / lead" Binding="{Binding Availability}" x:DataType="local:ResultRow" Width="110" />
                     <DataGridTemplateColumn Tag="Datasheet" Header="Datasheet" Width="75" SortMemberPath="DatasheetUrl">

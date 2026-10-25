@@ -14,9 +14,28 @@ public sealed class ResultRow : INotifyPropertyChanged
     public string Description { get; init; } = "";
     public string Type { get; init; } = "";
     public long? Stock { get; init; }
-    public decimal? UnitPrice { get; init; }
-    public string Currency { get; init; } = "";
-    public string PriceBreaks { get; init; } = "";
+
+    // Price, Cur and Price breaks: the supplier's own, or converted when "Prices in GBP" is ticked.
+    private decimal? _unitPrice;
+    public decimal? UnitPrice { get => _unitPrice; set => Set(ref _unitPrice, value); }
+    private string _currency = "";
+    public string Currency { get => _currency; set => Set(ref _currency, value); }
+    private string _priceBreaks = "";
+    public string PriceBreaks { get => _priceBreaks; set => Set(ref _priceBreaks, value); }
+
+    // The supplier's own prices, kept while converted ones are shown.
+    public decimal? OrigUnitPrice { get; init; }
+    public string OrigCurrency { get; init; } = "";
+    public string OrigBreaks { get; init; } = "";
+    /// <summary>The breaks as numbers, "1:0.2;10:0.139", for converting.</summary>
+    public string BreaksRaw { get; init; } = "";
+    /// <summary>True while the prices shown are converted (shown in purple).</summary>
+    public bool Converted { get; set; }
+    public decimal? RateUsed { get; set; }
+    private string? _priceTip;
+    /// <summary>Tooltip on the price cells: the supplier's own price and the rate used (null = none).</summary>
+    public string? PriceTip { get => _priceTip; set => Set(ref _priceTip, value); }
+
     public int? Moq { get; init; }
     public string Availability { get; init; } = "";
     public string SupplierPartNo { get; init; } = "";
@@ -82,4 +101,11 @@ public sealed class ResultRow : INotifyPropertyChanged
 
     /// <summary>The photo URL Thumb / NoPhoto currently show ("" = none); null until the row is first shown.</summary>
     public string? ThumbFor { get; set; }
+
+    private void Set<T>(ref T field, T value, [System.Runtime.CompilerServices.CallerMemberName] string name = "")
+    {
+        if (Equals(field, value)) return;
+        field = value;
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
+    }
 }

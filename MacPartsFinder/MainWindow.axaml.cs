@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Diagnostics;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -26,7 +27,7 @@ namespace MacPartsFinder;
 public partial class MainWindow : Window
 {
     // ==== THE version number - change it here for each release (to match the vX.Y.Z tag Release.bat makes) ====
-    public const string AppVersion = "V0.1.2";
+    public const string AppVersion = "V1.0.0";
     private const string TitleSuffix = "(Free for Non-Commercial Use • Support MacPartsFinder - see About)";
 
     private AppSettings _settings;
@@ -67,6 +68,10 @@ public partial class MainWindow : Window
         _loading = true;
         chkInStock.IsChecked = _settings.InStockOnly;
         _loading = false;
+        _settingConvert = true; // (no fetching while the window is still being set up)
+        chkConvert.IsChecked = _settings.ConvertPrices;
+        _settingConvert = false;
+        UpdateConvertText();
 
         // Filtered (hidden rows stay in _rows) and in arrival order until the user sorts by a column.
         _view = new DataGridCollectionView(_rows) { Filter = o => RowVisible((ResultRow)o) };
@@ -113,6 +118,8 @@ public partial class MainWindow : Window
             _normalPosition = Position;
             _normalSize = ClientSize;
             cboSearch.Focus();
+            // Prices in one currency: fetch new exchange rates in the background if the saved ones are 12+ hours old.
+            if (chkConvert.IsChecked == true) _ = RefreshRatesAsync(showDone: false);
             if (_settings.LoadError.Length > 0) await MessageBox.Show(this, _settings.LoadError, Title ?? "");
         };
         PositionChanged += (_, _) =>
@@ -194,6 +201,7 @@ public partial class MainWindow : Window
         _settings.ResultColumns = CurrentColumnLayout();
         _settings.MaxResults = MaxPerSupplier;
         _settings.InStockOnly = chkInStock.IsChecked == true;
+        _settings.ConvertPrices = chkConvert.IsChecked == true;
         foreach (var row in _supplierRows)
         {
             _settings.EnabledSuppliers[row.Name] = row.IsChecked;
@@ -568,6 +576,12 @@ public partial class MainWindow : Window
             UnitPrice = p.UnitPrice,
             Currency = p.Currency,
             PriceBreaks = p.PriceBreaksText(),
+            // "Prices in GBP": the columns above show converted prices; the supplier's own are kept here.
+            OrigUnitPrice = p.UnitPrice,
+            OrigCurrency = p.Currency,
+            OrigBreaks = p.PriceBreaksText(),
+            BreaksRaw = string.Join(";", p.PriceBreaks.OrderBy(b => b.Quantity)
+                .Select(b => b.Quantity.ToString(CultureInfo.InvariantCulture) + ":" + b.Price.ToString(CultureInfo.InvariantCulture))),
             Moq = p.MinOrderQty,
             Availability = p.StockInfo,
             SupplierPartNo = p.SupplierPartNumber,
@@ -581,6 +595,7 @@ public partial class MainWindow : Window
             Order = _batch * OrderPerBatch + seq
             // No - given when the search / Load more finishes
         };
+        ConvertRow(row);
         _rows.Add(row);
 
         var key = MpnKey(p.ManufacturerPartNumber);
@@ -741,6 +756,9 @@ public partial class MainWindow : Window
             "Datasheet" or "DatasheetUrl" => r.DatasheetUrl,
             "Status" => r.Status,
             "ProductUrl" => r.ProductUrl,
+            "OrigUnitPrice" => r.OrigUnitPrice,
+            "OrigCurrency" => r.OrigCurrency,
+            "OrigBreaks" => r.OrigBreaks,
             _ => null
         };
         return Convert.ToString(v) ?? "";
@@ -753,6 +771,7 @@ public partial class MainWindow : Window
         e.Row.Classes.Set("link", r.LinkOnly);
         e.Row.Classes.Set("nostock", !r.LinkOnly && r.Stock == 0);
         e.Row.Classes.Set("instock", !r.LinkOnly && r.Stock != 0);
+        e.Row.Classes.Set("conv", !r.LinkOnly && r.Converted); // converted prices in purple
         // Photos are only fetched for rows that come into view.
         if (_settings.ShowThumbnails) EnsureThumb(r);
     }
@@ -1014,15 +1033,176 @@ public partial class MainWindow : Window
         return $"Order code {code} is {mpn} ({foundAt}); the other suppliers were searched for {mpn}.";
     }
 
-    /// <summary>The Price column shows the price at the Advanced search quantity, when one is set.</summary>
+    /// <summary>The Price column shows the price at the Advanced search quantity, when one is set,
+    /// and the "Prices in" currency when that's ticked, e.g. "Price (100) GBP".</summary>
     private void UpdatePriceHeader()
     {
         var qty = _active?.Quantity ?? 0;
         if (Column("UnitPrice").Header is not TextBlock header) return;
-        header.Text = qty > 0 ? $"Price ({qty:#,##0})" : "Price (1)";
+        header.Text = (qty > 0 ? $"Price ({qty:#,##0})" : "Price (1)") + (Converting ? " " + _settings.ConvertCurrency : "");
         ToolTip.SetTip(header, (qty > 0 ? $"Price each when buying {qty:#,##0} (from the price breaks)."
-                                        : "Price each at the lowest price break (usually qty 1).") + "\nClick to sort.");
+                                        : "Price each at the lowest price break (usually qty 1).") +
+                               (Converting ? $"\nShown in {_settings.ConvertCurrency} (purple = converted, approximate)." : "") +
+                               "\nClick to sort.");
     }
+
+    #region Prices in one currency
+
+    // "Prices in GBP" (toolbar): every price is shown in the currency chosen in Settings, using ECB exchange rates.
+    // Rates are saved in settings.json and only fetched again after 12 hours (see ExchangeRates).
+    private bool _settingConvert;   // true while the tick box is set from code (don't fetch)
+    private bool _fetchingRates;
+
+    /// <summary>True when prices are being shown converted (ticked, and rates are available).</summary>
+    private bool Converting => chkConvert.IsChecked == true && _settings.Rates.HasRates;
+
+    private void UpdateConvertText()
+    {
+        chkConvert.Content = $"Prices in {_settings.ConvertCurrency}";
+    }
+
+    private async void ChkConvert_Changed(object? sender, RoutedEventArgs e)
+    {
+        if (_settingConvert) return;
+        _settings.ConvertPrices = chkConvert.IsChecked == true;
+        if (chkConvert.IsChecked == true && _settings.Rates.NeedsRefresh)
+            await RefreshRatesAsync(showDone: true);
+        else
+            ApplyConversion();
+    }
+
+    /// <summary>
+    /// Fetches new exchange rates if the saved ones are 12+ hours old (or there are none), then shows the prices.
+    /// If the rates can't be fetched, the last saved ones are used; with none at all, the tick is taken off.
+    /// </summary>
+    private async Task RefreshRatesAsync(bool showDone)
+    {
+        if (_fetchingRates) return;
+        if (_settings.Rates.NeedsRefresh)
+        {
+            _fetchingRates = true;
+            var oldStatus = lblStatus.Text ?? "";
+            SetStatus("Getting today's exchange rates…");
+            try
+            {
+                _settings.Rates = await ExchangeRates.DownloadAsync(CancellationToken.None);
+                try
+                {
+                    _settings.Save(); // so a restart within 12 hours doesn't fetch again
+                }
+                catch
+                {
+                    // saved again on exit anyway
+                }
+            }
+            catch (Exception ex)
+            {
+                if (!_settings.Rates.HasRates)
+                {
+                    _settingConvert = true;
+                    chkConvert.IsChecked = false;
+                    _settingConvert = false;
+                    _settings.ConvertPrices = false;
+                    SetStatus($"Prices in {_settings.ConvertCurrency} is off: {ex.Message} Check your internet connection and tick it again.");
+                    ApplyConversion(showStatus: false);
+                    return;
+                }
+                SetStatus($"Couldn't get new exchange rates ({ex.Message}) - using the saved {_settings.Rates.Describe()}.");
+                showDone = false;
+            }
+            finally
+            {
+                _fetchingRates = false;
+            }
+            if (!showDone && (lblStatus.Text ?? "").StartsWith("Getting today", StringComparison.Ordinal)) SetStatus(oldStatus);
+        }
+        ApplyConversion(showStatus: showDone);
+    }
+
+    /// <summary>Shows every row's prices converted, or back as the supplier gave them, to match the tick box.</summary>
+    private void ApplyConversion(bool showStatus = true)
+    {
+        foreach (var r in _rows)
+        {
+            ConvertRow(r);
+        }
+        UpdatePriceHeader();
+        _view.Refresh(); // re-sorts by the new prices, and redraws the purple
+        if (!showStatus) return;
+        if (Converting)
+        {
+            var missing = _rows.Where(r => !r.LinkOnly && !r.Converted && r.OrigCurrency.Length > 0 &&
+                                           !string.Equals(r.OrigCurrency, _settings.ConvertCurrency, StringComparison.OrdinalIgnoreCase))
+                               .Select(r => r.OrigCurrency.ToUpperInvariant()).Distinct().ToList();
+            SetStatus($"Prices shown in {_settings.ConvertCurrency} (purple = converted) at {_settings.Rates.Describe()}." +
+                      (_settings.Rates.AgeDays > 4 ? $" These rates are {_settings.Rates.AgeDays} days old." : "") +
+                      (missing.Count > 0 ? $" No rate for {string.Join(", ", missing)}, so those are shown as the supplier gave them." : "") +
+                      " Converted prices are approximate.");
+        }
+        else
+        {
+            SetStatus("Prices shown as each supplier gave them.");
+        }
+    }
+
+    /// <summary>Puts one row's converted prices (or the supplier's own) into the Price, Cur and Price breaks columns,
+    /// with the tooltip for those cells.</summary>
+    private void ConvertRow(ResultRow r)
+    {
+        if (r.LinkOnly) return;
+        var origCur = r.OrigCurrency;
+        var target = _settings.ConvertCurrency;
+        decimal? rate = null;
+        if (Converting && !string.Equals(origCur, target, StringComparison.OrdinalIgnoreCase))
+        {
+            rate = _settings.Rates.Rate(origCur, target);
+        }
+        if (rate.HasValue)
+        {
+            r.UnitPrice = r.OrigUnitPrice.HasValue ? Math.Round(r.OrigUnitPrice.Value * rate.Value, 4) : null;
+            r.Currency = target;
+            r.PriceBreaks = BreaksText(r.BreaksRaw, rate.Value);
+            r.Converted = true;
+            r.RateUsed = rate.Value;
+            // Hover over a converted price: what the supplier actually charges, and the rate used.
+            var orig = r.OrigUnitPrice.HasValue ? $"{r.OrigUnitPrice.Value:0.00##} {origCur}" : "";
+            r.PriceTip = $"{r.Supplier} price: {orig}\nBreaks: {r.OrigBreaks}\n" +
+                         $"Converted at 1 {origCur} = {rate.Value:0.#####} {target} ({_settings.Rates.Describe()}).\n" +
+                         "Approximate - the supplier's own rate, VAT and import charges will differ.";
+        }
+        else
+        {
+            r.UnitPrice = r.OrigUnitPrice;
+            r.Currency = origCur;
+            r.PriceBreaks = r.OrigBreaks;
+            r.Converted = false;
+            r.RateUsed = null;
+            r.PriceTip = Converting && origCur.Length > 0 && !string.Equals(origCur, target, StringComparison.OrdinalIgnoreCase)
+                ? $"No exchange rate for {origCur}, so this price is shown as {r.Supplier} gave it."
+                : null;
+        }
+    }
+
+    /// <summary>"1+ 0.20   10+ 0.139" from "1:0.2;10:0.139", with every price multiplied by the rate.</summary>
+    private static string BreaksText(string raw, decimal rate)
+    {
+        return string.Join("   ", raw.Split(';', StringSplitOptions.RemoveEmptyEntries).Select(pair =>
+        {
+            var bits = pair.Split(':');
+            var price = Math.Round(decimal.Parse(bits[1], CultureInfo.InvariantCulture) * rate, 4);
+            return $"{bits[0]}+ {price:0.00##}";
+        }));
+    }
+
+    /// <summary>A price in the "Prices in" currency when converting (for Advanced search's Max price each).</summary>
+    private decimal PriceInShownCurrency(decimal price, string currency)
+    {
+        if (!Converting) return price;
+        var rate = _settings.Rates.Rate(currency, _settings.ConvertCurrency);
+        return rate.HasValue ? price * rate.Value : price;
+    }
+
+    #endregion
 
     /// <summary>Where a supplier's results got to, so Load more can fetch the next page.</summary>
     private sealed class PagingState
@@ -1137,7 +1317,7 @@ public partial class MainWindow : Window
                 if (_active != null)
                 {
                     if (_active.Quantity > 0) p.UnitPrice = AdvancedSearchOptions.PriceAt(p, _active.Quantity);
-                    if (!_active.Matches(p))
+                    if (!_active.Matches(p, PriceInShownCurrency))
                     {
                         st.Filtered++;
                         _advancedHidden++;
@@ -1424,13 +1604,19 @@ public partial class MainWindow : Window
     private async void BtnSettings_Click(object? sender, RoutedEventArgs e)
     {
         HideSuggestions();
+        var ratesBefore = _settings.Rates;
         var dlg = new SettingsWindow(_settings);
-        if (!await dlg.ShowDialog<bool>(this)) return;
+        var saved = await dlg.ShowDialog<bool>(this);
+        // "Update now" fetched new exchange rates: show them straight away, even if Settings was cancelled.
+        if (!saved && _settings.Rates != ratesBefore) ApplyConversion(showStatus: false);
+        if (!saved) return;
         if (dlg.ResetWindowRequested) ResetWindowLayout();
         var error = SaveUiSettings();
         SettingsWindow.ApplyTheme(_settings.DarkMode);
         RebuildSuppliers();
         ApplyThumbnailSetting();
+        UpdateConvertText();
+        ApplyConversion(showStatus: false); // the "Prices in" currency may have changed
         // Rows already on screen pick up the photo setting when they're next shown.
         if (_settings.ShowThumbnails) RefreshThumbsOnScreen();
         if (error.Length > 0)
@@ -1502,7 +1688,12 @@ public partial class MainWindow : Window
         // The Datasheet column is the URL itself; it goes at the end as "Datasheet URL" instead.
         var cols = VisibleColumns().Where(c => ColumnName(c) != "Datasheet").ToList();
         var names = cols.Select(ColumnName).Concat(new[] { "ProductUrl", "DatasheetUrl" }).ToList();
-        var headers = cols.Select(HeaderText).Concat(new[] { "Product URL", "Datasheet URL" });
+        var headers = cols.Select(HeaderText).Concat(new[] { "Product URL", "Datasheet URL" }).ToList();
+        if (Converting) // keep the supplier's own prices too
+        {
+            names.AddRange(new[] { "OrigUnitPrice", "OrigCurrency", "OrigBreaks" });
+            headers.AddRange(new[] { "Supplier's price", "Supplier's currency", "Supplier's price breaks" });
+        }
         var sb = new StringBuilder();
         sb.AppendLine(string.Join(",", headers.Select(CsvQuote)));
         foreach (var row in _view.Cast<ResultRow>())

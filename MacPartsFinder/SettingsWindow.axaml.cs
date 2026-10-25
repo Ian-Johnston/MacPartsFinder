@@ -68,6 +68,9 @@ public partial class SettingsWindow : Window
         txtTmeSecret.Text = settings.TmeSecret;
         cboTmeCountry.Text = settings.TmeCountry;
         cboTmeCurrency.Text = settings.TmeCurrency;
+        cboConvertCurrency.ItemsSource = ExchangeRates.Currencies;
+        cboConvertCurrency.SelectedItem = ExchangeRates.Currencies.Contains(settings.ConvertCurrency) ? settings.ConvertCurrency : "GBP";
+        ShowRatesInfo();
         chkShowThumbnails.IsChecked = settings.ShowThumbnails;
         chkDarkMode.IsChecked = settings.DarkMode;
         gridUrls.ItemsSource = _urls;
@@ -193,6 +196,7 @@ public partial class SettingsWindow : Window
         if (tmeCountry.Length > 0) _settings.TmeCountry = tmeCountry.ToUpperInvariant();
         var tmeCurrency = (cboTmeCurrency.Text ?? "").Trim();
         if (tmeCurrency.Length > 0) _settings.TmeCurrency = tmeCurrency.ToUpperInvariant();
+        if (cboConvertCurrency.SelectedItem is string convertTo) _settings.ConvertCurrency = convertTo;
         _settings.ShowThumbnails = chkShowThumbnails.IsChecked == true;
         _settings.DarkMode = chkDarkMode.IsChecked == true;
 
@@ -219,6 +223,36 @@ public partial class SettingsWindow : Window
         // Resets the built-in URLs only; your own suppliers are kept.
         gridUrls.CommitEdit();
         LoadUrls(name => AppSettings.DefaultSearchUrl(name, SelectedFarnellStore()), CurrentCustoms());
+    }
+
+    /// <summary>"ECB rates of 23 Oct 2026 (fetched 25 Oct 10:02)" - or that there are none yet.</summary>
+    private void ShowRatesInfo()
+    {
+        var r = _settings.Rates;
+        lblRates.Text = r.HasRates && r.FetchedUtc.HasValue
+            ? $"{r.Describe()} (fetched {r.FetchedUtc.Value.ToLocalTime():d MMM HH:mm})"
+            : "No rates yet.";
+    }
+
+    // Rates are data, not a preference, so a successful update is kept even if Settings is then cancelled.
+    private async void BtnUpdateRates_Click(object? sender, RoutedEventArgs e)
+    {
+        btnUpdateRates.IsEnabled = false;
+        lblRates.Text = "Getting today's rates…";
+        try
+        {
+            _settings.Rates = await ExchangeRates.DownloadAsync(System.Threading.CancellationToken.None);
+            ShowRatesInfo();
+        }
+        catch (Exception ex)
+        {
+            ShowRatesInfo();
+            await MessageBox.Show(this, ex.Message + Environment.NewLine + "Check your internet connection and try again.", Title ?? "");
+        }
+        finally
+        {
+            btnUpdateRates.IsEnabled = true;
+        }
     }
 
     private string SelectedFarnellStore()

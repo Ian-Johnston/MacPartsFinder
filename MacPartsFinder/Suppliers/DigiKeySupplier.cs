@@ -19,19 +19,20 @@ namespace MacPartsFinder;
 /// </summary>
 public class DigiKeySupplier : ApiSupplier
 {
-    /// <summary>DigiKey country sites for Settings - every one tested live (Oct 2026). Any other code can still be typed in.</summary>
+    /// <summary>DigiKey country sites for Settings - every one tested live (Oct 2026). Any other code can still be typed in.
+    /// Taiwan is left out: there's no ECB exchange rate for its dollar, so Prices in GBP couldn't convert it.</summary>
     public static readonly string[] Sites =
     {
         "UK", "IE", "US", "CA", "AU", "NZ", "DE", "FR", "IT", "ES", "NL", "BE", "AT", "LU", "PT", "FI", "GR",
         "EE", "LV", "LT", "SK", "SI", "BG", "CH", "SE", "NO", "DK", "PL", "CZ", "HU", "RO", "IL", "ZA",
-        "JP", "KR", "CN", "HK", "TW", "SG", "MY", "TH", "PH", "IN", "MX"
+        "JP", "KR", "CN", "HK", "SG", "MY", "TH", "PH", "IN", "MX"
     };
 
     /// <summary>Currencies DigiKey prices in - every one tested live.</summary>
     public static readonly string[] Currencies =
     {
         "GBP", "EUR", "USD", "CAD", "AUD", "NZD", "CHF", "SEK", "NOK", "DKK", "PLN", "CZK", "HUF", "RON",
-        "ILS", "ZAR", "JPY", "KRW", "CNY", "HKD", "TWD", "SGD", "MYR", "THB", "PHP", "INR"
+        "ILS", "ZAR", "JPY", "KRW", "CNY", "HKD", "SGD", "MYR", "THB", "PHP", "INR"
     };
 
     private const string TokenUrl = "https://api.digikey.com/v1/oauth2/token";

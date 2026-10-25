@@ -143,7 +143,9 @@ public class AdvancedSearchOptions
         Quantity > 0 || MaxUnitPrice.HasValue;
 
     /// <summary>App-side filters. Website-link rows always pass.</summary>
-    public bool Matches(PartResult p)
+    /// <param name="toShownCurrency">When prices are shown in one currency, converts a price so Max price each
+    /// is compared in that currency. null = compare in the supplier's own currency.</param>
+    public bool Matches(PartResult p, Func<decimal, string, decimal>? toShownCurrency = null)
     {
         if (p.IsLinkOnly) return true;
         if (ActiveOnly && IsNotActive(p.Status)) return false;
@@ -161,6 +163,7 @@ public class AdvancedSearchOptions
         {
             // No price listed counts as "not under the limit" - those usually can't be bought anyway.
             var price = PriceAt(p, Math.Max(1, Quantity));
+            if (price.HasValue && toShownCurrency != null) price = toShownCurrency(price.Value, p.Currency);
             if (!price.HasValue || price.Value > MaxUnitPrice.Value) return false;
         }
         return true;

@@ -75,6 +75,12 @@ public class AppSettings
     public string TmeCountry { get; set; } = "GB";
     public string TmeCurrency { get; set; } = "GBP";
 
+    // ---- Show every price in one currency (toolbar "Prices in GBP") ----
+    public bool ConvertPrices { get; set; } = false;
+    public string ConvertCurrency { get; set; } = ExchangeRates.DefaultCurrency();
+    /// <summary>The last exchange rates fetched, and when - only fetched again after 12 hours.</summary>
+    public ExchangeRates Rates { get; set; } = new();
+
     // ---- General ----
     public int MaxResults { get; set; } = 25;
     public bool InStockOnly { get; set; } = false;

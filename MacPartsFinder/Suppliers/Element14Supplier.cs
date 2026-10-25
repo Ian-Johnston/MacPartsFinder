@@ -44,7 +44,8 @@ public class Element14Supplier : ApiSupplier
         public override string ToString() => $"{Country} - {Id} ({Currency})";
     }
 
-    /// <summary>The stores the Farnell supplier can use - each one tested live with a search and a photo (Oct 2026).</summary>
+    /// <summary>The stores the Farnell supplier can use - each one tested live with a search and a photo (Oct 2026).
+    /// Taiwan is left out (no ECB exchange rate for TWD), and Indonesia (the API rejects it).</summary>
     public static readonly List<Store> FarnellStores = new()
     {
         new Store("uk.farnell.com", "United Kingdom", "GBP"),
@@ -82,7 +83,6 @@ public class Element14Supplier : ApiSupplier
         new Store("in.element14.com", "India", "INR"),
         new Store("cn.element14.com", "China", "CNY"),
         new Store("hk.element14.com", "Hong Kong", "HKD"),
-        new Store("tw.element14.com", "Taiwan", "TWD"),
         new Store("kr.element14.com", "South Korea", "KRW"),
         new Store("th.element14.com", "Thailand", "THB"),
         new Store("ph.element14.com", "Philippines", "PHP"),

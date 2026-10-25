@@ -20,11 +20,14 @@
                     <SolidColorBrush x:Key="LinkTextBrush" Color="RoyalBlue" />
                     <SolidColorBrush x:Key="MutedTextBrush" Color="#6D6D6D" />
                     <SolidColorBrush x:Key="GoodTextBrush" Color="DarkGreen" />
+                    <!-- Prices converted to the "Prices in" currency, so they stand out as estimates -->
+                    <SolidColorBrush x:Key="ConvertedTextBrush" Color="#8000AA" />
                 </ResourceDictionary>
                 <ResourceDictionary x:Key="Dark">
                     <SolidColorBrush x:Key="LinkTextBrush" Color="#6EAFFF" />
                     <SolidColorBrush x:Key="MutedTextBrush" Color="#969696" />
                     <SolidColorBrush x:Key="GoodTextBrush" Color="#6ECD78" />
+                    <SolidColorBrush x:Key="ConvertedTextBrush" Color="#CD96FF" />
                 </ResourceDictionary>
             </ResourceDictionary.ThemeDictionaries>
             <!-- 12px text throughout, like WinPartsFinder's 9pt Segoe UI (Fluent's default is 14px) -->
