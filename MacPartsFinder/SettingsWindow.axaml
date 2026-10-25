@@ -3,7 +3,7 @@
         xmlns:local="using:MacPartsFinder"
         x:Class="MacPartsFinder.SettingsWindow"
         Title="Settings"
-        Width="900" Height="850" MinWidth="760" MinHeight="790"
+        Width="950" Height="850" MinWidth="900" MinHeight="790"
         ShowInTaskbar="False" WindowStartupLocation="CenterOwner">
 
     <Window.Styles>
@@ -60,8 +60,11 @@
                         ToolTip.Tip="Close without saving any changes." />
             </StackPanel>
             <StackPanel Orientation="Horizontal" Spacing="14" VerticalAlignment="Center">
-                <CheckBox x:Name="chkDarkMode" Content="Dark mode" IsCheckedChanged="ChkDarkMode_Changed"
-                          ToolTip.Tip="Switch the whole app to a dark theme. Previews here straight away." />
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                    <TextBlock Text="Theme:" VerticalAlignment="Center" />
+                    <ComboBox x:Name="cboTheme" Width="105" SelectionChanged="CboTheme_SelectionChanged"
+                              ToolTip.Tip="Colour theme for the whole app: Light (normal), Soft grey (light, less glare),&#10;Dark grey (a softer dark) or Dark. Previews straight away; applies everywhere when you click OK." />
+                </StackPanel>
                 <CheckBox x:Name="chkShowThumbnails" Content="Show part photos"
                           ToolTip.Tip="Show a small part photo at the start of each result row. Untick for a compact grid." />
                 <CheckBox x:Name="chkShowKeys" Content="Show keys" IsCheckedChanged="ChkShowKeys_Changed"

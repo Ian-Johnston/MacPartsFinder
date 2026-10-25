@@ -1,9 +1,10 @@
 <Application xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="using:MacPartsFinder"
              x:Class="MacPartsFinder.App"
              Name="MacPartsFinder"
              RequestedThemeVariant="Light">
-             <!-- Light or Dark is set from the Dark mode setting when the main window opens. -->
+             <!-- Light, Soft grey, Dark grey or Dark is set from the Theme setting when the main window opens (AppThemes). -->
 
     <!-- The Mac's app menu (MacPartsFinder > About MacPartsFinder). Windows ignores it. -->
     <NativeMenu.Menu>
@@ -22,12 +23,80 @@
                     <SolidColorBrush x:Key="GoodTextBrush" Color="DarkGreen" />
                     <!-- Prices converted to the "Prices in" currency, so they stand out as estimates -->
                     <SolidColorBrush x:Key="ConvertedTextBrush" Color="#8000AA" />
+                    <!-- Grids: see-through in Light and Dark (as before); their own shade in the grey themes -->
+                    <SolidColorBrush x:Key="AppListBackground" Color="Transparent" />
                 </ResourceDictionary>
                 <ResourceDictionary x:Key="Dark">
                     <SolidColorBrush x:Key="LinkTextBrush" Color="#6EAFFF" />
                     <SolidColorBrush x:Key="MutedTextBrush" Color="#969696" />
                     <SolidColorBrush x:Key="GoodTextBrush" Color="#6ECD78" />
                     <SolidColorBrush x:Key="ConvertedTextBrush" Color="#CD96FF" />
+                    <SolidColorBrush x:Key="AppListBackground" Color="Transparent" />
+                </ResourceDictionary>
+
+                <!-- Soft grey (built on Light): light greys instead of bright white, with text and colours a touch darker so
+                     they still stand out - WinPartsFinder's Theme.vb colours. These replace the Fluent theme's own brushes. -->
+                <ResourceDictionary x:Key="{x:Static local:AppThemes.SoftGrey}">
+                    <SolidColorBrush x:Key="LinkTextBrush" Color="#1C4EBE" />
+                    <SolidColorBrush x:Key="MutedTextBrush" Color="#696969" />
+                    <SolidColorBrush x:Key="GoodTextBrush" Color="#006900" />
+                    <SolidColorBrush x:Key="ConvertedTextBrush" Color="#7600A0" />
+                    <SolidColorBrush x:Key="AppListBackground" Color="#E6E6E6" />
+                    <!-- window -->
+                    <SolidColorBrush x:Key="SystemControlBackgroundAltHighBrush" Color="#D6D6D6" />
+                    <SolidColorBrush x:Key="SystemControlPageBackgroundAltHighBrush" Color="#D6D6D6" />
+                    <SolidColorBrush x:Key="SystemRegionBrush" Color="#D6D6D6" />
+                    <SolidColorBrush x:Key="SystemControlForegroundBaseHighBrush" Color="#181818" />
+                    <!-- text boxes and drop-downs -->
+                    <SolidColorBrush x:Key="TextControlBackground" Color="#EEEEEE" />
+                    <SolidColorBrush x:Key="TextControlBackgroundPointerOver" Color="#F2F2F2" />
+                    <SolidColorBrush x:Key="TextControlBackgroundFocused" Color="#F4F4F4" />
+                    <SolidColorBrush x:Key="TextControlForeground" Color="#181818" />
+                    <SolidColorBrush x:Key="ComboBoxBackground" Color="#EEEEEE" />
+                    <SolidColorBrush x:Key="ComboBoxBackgroundPointerOver" Color="#F2F2F2" />
+                    <SolidColorBrush x:Key="ComboBoxForeground" Color="#181818" />
+                    <SolidColorBrush x:Key="ComboBoxDropDownBackground" Color="#E6E6E6" />
+                    <!-- buttons, pop-ups, grid headers -->
+                    <SolidColorBrush x:Key="ButtonForeground" Color="#181818" />
+                    <SolidColorBrush x:Key="ToolTipBackground" Color="#E6E6E6" />
+                    <SolidColorBrush x:Key="ToolTipForeground" Color="#181818" />
+                    <SolidColorBrush x:Key="MenuFlyoutPresenterBackground" Color="#E6E6E6" />
+                    <SolidColorBrush x:Key="FlyoutPresenterBackground" Color="#E6E6E6" />
+                    <SolidColorBrush x:Key="DataGridColumnHeaderBackgroundBrush" Color="#C8C8C8" />
+                    <SolidColorBrush x:Key="DataGridColumnHeaderForegroundBrush" Color="#3A3A3A" />
+                    <SolidColorBrush x:Key="ScrollViewerScrollBarsSeparatorBackground" Color="#C8C8C8" />
+                </ResourceDictionary>
+
+                <!-- Dark grey (built on Dark): slate rather than black - easier on the eyes at night (Theme.vb colours) -->
+                <ResourceDictionary x:Key="{x:Static local:AppThemes.DarkGrey}">
+                    <SolidColorBrush x:Key="LinkTextBrush" Color="#7DB6FF" />
+                    <SolidColorBrush x:Key="MutedTextBrush" Color="#969DA8" />
+                    <SolidColorBrush x:Key="GoodTextBrush" Color="#7DD487" />
+                    <SolidColorBrush x:Key="ConvertedTextBrush" Color="#D4A5FF" />
+                    <SolidColorBrush x:Key="AppListBackground" Color="#353A43" />
+                    <!-- window -->
+                    <SolidColorBrush x:Key="SystemControlBackgroundAltHighBrush" Color="#2C3038" />
+                    <SolidColorBrush x:Key="SystemControlPageBackgroundAltHighBrush" Color="#2C3038" />
+                    <SolidColorBrush x:Key="SystemRegionBrush" Color="#2C3038" />
+                    <SolidColorBrush x:Key="SystemControlForegroundBaseHighBrush" Color="#DEE2E8" />
+                    <!-- text boxes and drop-downs -->
+                    <SolidColorBrush x:Key="TextControlBackground" Color="#3D434D" />
+                    <SolidColorBrush x:Key="TextControlBackgroundPointerOver" Color="#434A55" />
+                    <SolidColorBrush x:Key="TextControlBackgroundFocused" Color="#353A43" />
+                    <SolidColorBrush x:Key="TextControlForeground" Color="#DEE2E8" />
+                    <SolidColorBrush x:Key="ComboBoxBackground" Color="#3D434D" />
+                    <SolidColorBrush x:Key="ComboBoxBackgroundPointerOver" Color="#434A55" />
+                    <SolidColorBrush x:Key="ComboBoxForeground" Color="#DEE2E8" />
+                    <SolidColorBrush x:Key="ComboBoxDropDownBackground" Color="#353A43" />
+                    <!-- buttons, pop-ups, grid headers -->
+                    <SolidColorBrush x:Key="ButtonForeground" Color="#DEE2E8" />
+                    <SolidColorBrush x:Key="ToolTipBackground" Color="#353A43" />
+                    <SolidColorBrush x:Key="ToolTipForeground" Color="#DEE2E8" />
+                    <SolidColorBrush x:Key="MenuFlyoutPresenterBackground" Color="#353A43" />
+                    <SolidColorBrush x:Key="FlyoutPresenterBackground" Color="#353A43" />
+                    <SolidColorBrush x:Key="DataGridColumnHeaderBackgroundBrush" Color="#424853" />
+                    <SolidColorBrush x:Key="DataGridColumnHeaderForegroundBrush" Color="#C8CDD5" />
+                    <SolidColorBrush x:Key="ScrollViewerScrollBarsSeparatorBackground" Color="#424853" />
                 </ResourceDictionary>
             </ResourceDictionary.ThemeDictionaries>
             <!-- 12px text throughout, like WinPartsFinder's 9pt Segoe UI (Fluent's default is 14px) -->
@@ -36,7 +105,8 @@
     </Application.Resources>
 
     <Application.Styles>
-        <!-- Compact: smaller controls, closer to the Windows Forms layout -->
+        <!-- Compact: smaller controls, closer to the Windows Forms layout. (Soft grey and Dark grey's own colours are
+             in Application.Resources above - FluentTheme's own palettes only allow Light and Dark.) -->
         <FluentTheme DensityStyle="Compact" />
         <StyleInclude Source="avares://Avalonia.Controls.DataGrid/Themes/Fluent.xaml" />
         <Style Selector="Window">
@@ -44,6 +114,10 @@
         </Style>
         <Style Selector="DataGridCell, DataGridColumnHeader">
             <Setter Property="FontSize" Value="12" />
+        </Style>
+        <!-- Grids take their theme's list shade (see-through in Light and Dark, as before) -->
+        <Style Selector="DataGrid">
+            <Setter Property="Background" Value="{DynamicResource AppListBackground}" />
         </Style>
         <!-- Slimmer column headers: the standard ones keep 32px free for the sort arrow even when a column isn't
              sorted, which hides the header text of narrow columns like # and Hits. -->

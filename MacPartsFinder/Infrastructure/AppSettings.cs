@@ -85,7 +85,22 @@ public class AppSettings
     public int MaxResults { get; set; } = 25;
     public bool InStockOnly { get; set; } = false;
     public bool ShowThumbnails { get; set; } = true;
+    /// <summary>Older settings files only have this (ticked = Dark); kept so they still load the right theme.</summary>
     public bool DarkMode { get; set; } = false;
+    /// <summary>Light, SoftGrey, DarkGrey or Dark. null in settings from before themes - then DarkMode decides.</summary>
+    public ThemeKind? ThemeName { get; set; }
+
+    [JsonIgnore]
+    public ThemeKind AppTheme
+    {
+        get => ThemeName ?? (DarkMode ? ThemeKind.Dark : ThemeKind.Light);
+        set
+        {
+            ThemeName = value;
+            DarkMode = value == ThemeKind.Dark || value == ThemeKind.DarkGrey;
+        }
+    }
+
     /// <summary>User-added website-link suppliers, searched after the built-in ones.</summary>
     public List<CustomSupplier> CustomSuppliers { get; set; } = new();
     /// <summary>Main window size/position from last time; null = default.</summary>

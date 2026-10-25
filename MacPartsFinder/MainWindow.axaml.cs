@@ -27,7 +27,7 @@ namespace MacPartsFinder;
 public partial class MainWindow : Window
 {
     // ==== THE version number - change it here for each release (to match the vX.Y.Z tag Release.bat makes) ====
-    public const string AppVersion = "V1.0.0";
+    public const string AppVersion = "V1.0.1";
     private const string TitleSuffix = "(Free for Non-Commercial Use • Support MacPartsFinder - see About)";
 
     private AppSettings _settings;
@@ -60,7 +60,7 @@ public partial class MainWindow : Window
         _settings = AppSettings.Load();
         Title = $"MacPartsFinder - {AppVersion}      {TitleSuffix}";
         if (Application.Current != null)
-            Application.Current.RequestedThemeVariant = _settings.DarkMode ? ThemeVariant.Dark : ThemeVariant.Light;
+            Application.Current.RequestedThemeVariant = AppThemes.Variant(_settings.AppTheme);
 
         cboMode.ItemsSource = new[] { "Keyword", "Manufacturer part no." };
         cboMode.SelectedIndex = 0;
@@ -1612,7 +1612,7 @@ public partial class MainWindow : Window
         if (!saved) return;
         if (dlg.ResetWindowRequested) ResetWindowLayout();
         var error = SaveUiSettings();
-        SettingsWindow.ApplyTheme(_settings.DarkMode);
+        AppThemes.Apply(_settings.AppTheme);
         RebuildSuppliers();
         ApplyThumbnailSetting();
         UpdateConvertText();

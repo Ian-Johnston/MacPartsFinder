@@ -72,7 +72,8 @@ public partial class SettingsWindow : Window
         cboConvertCurrency.SelectedItem = ExchangeRates.Currencies.Contains(settings.ConvertCurrency) ? settings.ConvertCurrency : "GBP";
         ShowRatesInfo();
         chkShowThumbnails.IsChecked = settings.ShowThumbnails;
-        chkDarkMode.IsChecked = settings.DarkMode;
+        cboTheme.ItemsSource = AppThemes.Names;
+        cboTheme.SelectedIndex = (int)settings.AppTheme;
         gridUrls.ItemsSource = _urls;
         LoadUrls(settings.GetSearchUrl, settings.CustomSuppliers);
 
@@ -80,7 +81,7 @@ public partial class SettingsWindow : Window
         Closed += (_, _) =>
         {
             _apiHelp?.Close();
-            if (!_saved) ApplyTheme(_settings.DarkMode); // undo the Dark mode preview
+            if (!_saved) AppThemes.Apply(_settings.AppTheme); // undo the theme preview
         };
     }
 
@@ -198,7 +199,7 @@ public partial class SettingsWindow : Window
         if (tmeCurrency.Length > 0) _settings.TmeCurrency = tmeCurrency.ToUpperInvariant();
         if (cboConvertCurrency.SelectedItem is string convertTo) _settings.ConvertCurrency = convertTo;
         _settings.ShowThumbnails = chkShowThumbnails.IsChecked == true;
-        _settings.DarkMode = chkDarkMode.IsChecked == true;
+        _settings.AppTheme = (ThemeKind)Math.Max(0, cboTheme.SelectedIndex);
 
         _settings.SearchUrls.Clear();
         foreach (var row in _urls.Where(r => !r.IsCustom))
@@ -293,15 +294,10 @@ public partial class SettingsWindow : Window
         }
     }
 
-    private void ChkDarkMode_Changed(object? sender, RoutedEventArgs e)
+    private void CboTheme_SelectionChanged(object? sender, SelectionChangedEventArgs e)
     {
         // Live preview (the whole app follows); Cancel puts it back.
-        if (IsLoaded) ApplyTheme(chkDarkMode.IsChecked == true);
-    }
-
-    public static void ApplyTheme(bool dark)
-    {
-        if (Application.Current != null) Application.Current.RequestedThemeVariant = dark ? ThemeVariant.Dark : ThemeVariant.Light;
+        if (IsLoaded && cboTheme.SelectedIndex >= 0) AppThemes.Apply((ThemeKind)cboTheme.SelectedIndex);
     }
 
     // API Help isn't modal: it's owned by this window, so the key boxes stay usable while it's open,
