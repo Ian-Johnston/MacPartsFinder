@@ -27,7 +27,7 @@ namespace MacPartsFinder;
 public partial class MainWindow : Window
 {
     // ==== THE version number - change it here for each release (to match the vX.Y.Z tag Release.bat makes) ====
-    public const string AppVersion = "V1.0.2";
+    public const string AppVersion = "V1.0.3";
     private const string TitleSuffix = "(Free for Non-Commercial Use • Support MacPartsFinder - see About)";
 
     private AppSettings _settings;
@@ -75,8 +75,9 @@ public partial class MainWindow : Window
         _settingConvert = false;
         UpdateConvertText();
 
-        // Filtered (hidden rows stay in _rows) and in arrival order until the user sorts by a column.
+        // Filtered (hidden rows stay in _rows); website links first, then arrival order until the user sorts by a column.
         _view = new DataGridCollectionView(_rows) { Filter = o => RowVisible((ResultRow)o) };
+        _view.SortDescriptions.Add(LinksFirst);
         _view.SortDescriptions.Add(DataGridSortDescription.FromPath(nameof(ResultRow.Order)));
         gridResults.ItemsSource = _view;
         gridSuppliers.ItemsSource = _supplierRows;
@@ -527,7 +528,11 @@ public partial class MainWindow : Window
         var show = _settings.ShowThumbnails;
         Column("Thumb").IsVisible = show;
         gridResults.RowHeight = show ? ThumbRowHeight : PlainRowHeight;
+        _view.Refresh(); // re-sizes the rows on screen (website-link rows are set in GridResults_LoadingRow)
     }
+
+    /// <summary>Website-link rows are half height (no photo, one line of text); never smaller than a plain text row.</summary>
+    private double LinkRowHeight => Math.Max(PlainRowHeight, gridResults.RowHeight / 2);
 
     private static string MpnKey(string? mpn) => (mpn ?? "").Trim().ToUpperInvariant();
 
@@ -547,6 +552,8 @@ public partial class MainWindow : Window
     /// <summary>Shows the row's photo, starting its download if need be. Only called for rows on screen.</summary>
     private void EnsureThumb(ResultRow row)
     {
+        // Website-link rows have no part, so no photo (not even the "no photo" box - see the Thumb column).
+        if (row.LinkOnly) return;
         var url = ImageUrlsFor(row).Thumb;
         row.ThumbFor = url;
         row.Thumb = _images.GetThumbnail(url, out var failed);
@@ -805,6 +812,7 @@ public partial class MainWindow : Window
         e.Row.Classes.Set("instock", !r.LinkOnly && r.Stock != 0);
         e.Row.Classes.Set("conv", !r.LinkOnly && r.Converted); // converted prices in purple
         e.Row.Classes.Set("borrowedpkg", r.PackageFrom.Length > 0); // a package borrowed from another supplier, in orange
+        e.Row.Height = r.LinkOnly ? LinkRowHeight : gridResults.RowHeight;
         // Photos are only fetched for rows that come into view.
         if (_settings.ShowThumbnails) EnsureThumb(r);
     }
@@ -877,6 +885,7 @@ public partial class MainWindow : Window
     {
         // (Not inside DeferRefresh: the grid looks at the rows as each sort level changes, which a deferred view refuses.)
         _view.SortDescriptions.Clear();
+        _view.SortDescriptions.Add(LinksFirst); // website-link rows always stay at the top, whatever is sorted
         foreach (var k in _sortKeys)
         {
             _view.SortDescriptions.Add(DataGridSortDescription.FromPath(Column(k.Column).SortMemberPath,
@@ -885,6 +894,9 @@ public partial class MainWindow : Window
         _view.SortDescriptions.Add(DataGridSortDescription.FromPath(nameof(ResultRow.Order)));
         RefreshSortHeaders();
     }
+
+    private static readonly DataGridSortDescription LinksFirst =
+        DataGridSortDescription.FromPath(nameof(ResultRow.LinkOnly), ListSortDirection.Descending);
 
     // Small level numbers added to header text when sorting by more than one column.
     private const string LevelDigits = "¹²³⁴⁵⁶⁷⁸⁹";

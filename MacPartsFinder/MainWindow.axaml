@@ -86,6 +86,8 @@
         <!-- Results row lines: drawn under each real column's cells (class "gl", added in code), so they stop at the
              last column like WinPartsFinder's - the grid's own row line runs on across the empty space to the right. -->
         <Style Selector="DataGrid#gridResults DataGridCell.gl">
+            <!-- No 32px minimum (the theme's): website-link rows are only 22px, and a taller cell hides its line -->
+            <Setter Property="MinHeight" Value="0" />
             <Setter Property="BorderThickness" Value="0,0,0,1" />
             <Setter Property="BorderBrush" Value="{Binding $parent[DataGrid].HorizontalGridLinesBrush}" />
         </Style>
@@ -225,6 +227,7 @@
                         <DataGridTemplateColumn.CellTemplate>
                             <DataTemplate x:DataType="local:ResultRow">
                                 <Border Width="35" Height="35" Background="White" BorderBrush="Silver" BorderThickness="1"
+                                        IsVisible="{Binding !LinkOnly}"
                                         HorizontalAlignment="Center" VerticalAlignment="Center"
                                         Classes="thumb" Cursor="Hand" Tapped="Thumb_Tapped" ToolTip.Tip="Click for a bigger photo">
                                     <Panel>
