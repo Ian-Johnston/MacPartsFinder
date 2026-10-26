@@ -56,6 +56,14 @@
         <Style Selector="DataGrid#gridResults DataGridCell.price" x:DataType="local:ResultRow">
             <Setter Property="ToolTip.Tip" Value="{Binding PriceTip}" />
         </Style>
+        <!-- A package borrowed from another supplier's listing of the same part (Mouser doesn't give one), in orange;
+             hover to see whose it is -->
+        <Style Selector="DataGridRow.borrowedpkg DataGridCell.pkg">
+            <Setter Property="Foreground" Value="{DynamicResource BorrowedTextBrush}" />
+        </Style>
+        <Style Selector="DataGrid#gridResults DataGridCell.pkg" x:DataType="local:ResultRow">
+            <Setter Property="ToolTip.Tip" Value="{Binding PackageTip}" />
+        </Style>
 
         <!-- Supplier list: suppliers with no key are greyed; the tooltip says how the search went -->
         <Style Selector="DataGridRow.unconfigured DataGridCell">
@@ -196,7 +204,7 @@
             <DataGrid x:Name="gridResults" IsReadOnly="True" SelectionMode="Extended"
                       CanUserReorderColumns="True" CanUserResizeColumns="True" CanUserSortColumns="True"
                       FrozenColumnCount="1" HeadersVisibility="Column" GridLinesVisibility="Vertical"
-                      LoadingRow="GridResults_LoadingRow" DoubleTapped="GridResults_DoubleTapped" KeyDown="GridResults_KeyDown">
+                      Sorting="GridResults_Sorting" LoadingRow="GridResults_LoadingRow" DoubleTapped="GridResults_DoubleTapped" KeyDown="GridResults_KeyDown">
                 <DataGrid.ContextMenu>
                     <ContextMenu x:Name="cmsResults" Opening="CmsResults_Opening">
                         <MenuItem x:Name="mnuOpenProduct" Header="Open product page" Click="MnuOpenProduct_Click" />
@@ -229,7 +237,7 @@
                         </DataGridTemplateColumn.CellTemplate>
                     </DataGridTemplateColumn>
                     <DataGridTextColumn Tag="Supplier" Header="Supplier" Binding="{Binding Supplier}" x:DataType="local:ResultRow" Width="90"
-                                        SortMemberPath="Seq" />
+                                        SortMemberPath="SupplierRank" />
                     <DataGridTemplateColumn Tag="SupplierPartNo" Header="Supplier part no." Width="104" SortMemberPath="SupplierPartNo">
                         <DataGridTemplateColumn.CellTemplate>
                             <DataTemplate x:DataType="local:ResultRow">
@@ -242,6 +250,8 @@
                     <DataGridTextColumn Tag="Manufacturer" Header="Manufacturer" Binding="{Binding Manufacturer}" x:DataType="local:ResultRow" Width="110" />
                     <DataGridTextColumn Tag="Type" Header="Type" Binding="{Binding Type}" x:DataType="local:ResultRow" Width="160" />
                     <DataGridTextColumn Tag="Description" Header="Description" Binding="{Binding Description}" x:DataType="local:ResultRow" Width="280" />
+                    <DataGridTextColumn Tag="Package" Header="Package" Binding="{Binding Package}" x:DataType="local:ResultRow" Width="80"
+                                        CellStyleClasses="pkg" />
                     <DataGridTextColumn Tag="Stock" Header="Stock" Binding="{Binding Stock, StringFormat='{}{0:#,##0}'}" x:DataType="local:ResultRow"
                                         Width="55" CellStyleClasses="right stock" />
                     <DataGridTextColumn Tag="UnitPrice" Header="Price (1)" Binding="{Binding UnitPrice, StringFormat='{}{0:#,##0.00##}'}"

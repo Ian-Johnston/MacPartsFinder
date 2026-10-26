@@ -179,6 +179,7 @@ public class DigiKeySupplier : ApiSupplier
                 Manufacturer = p.GetStr("Manufacturer", "Name"),
                 Description = p.GetStr("Description", "ProductDescription"),
                 Category = DeepestCategory(p.GetPath("Category")),
+                Package = PackageOf(p),
                 Stock = ToNullableLong(p.GetNum("QuantityAvailable")),
                 Currency = _currency,
                 MinOrderQty = ToNullableInt(variation.GetNum("MinimumOrderQuantity")),
@@ -205,6 +206,19 @@ public class DigiKeySupplier : ApiSupplier
             results.Add(r);
         }
         return results;
+    }
+
+    /// <summary>"8-SOIC" from the part's parameters ("Supplier Device Package", else "Package / Case").</summary>
+    private static string PackageOf(JToken p)
+    {
+        var parameters = p.GetArr("Parameters");
+        foreach (var paramName in new[] { "Supplier Device Package", "Package / Case" })
+        {
+            var hit = parameters.FirstOrDefault(x => string.Equals(x.GetStr("ParameterText"), paramName, StringComparison.OrdinalIgnoreCase));
+            var v = hit.GetStr("ValueText");
+            if (v.Length > 0 && v != "-") return v;
+        }
+        return "";
     }
 
     /// <summary>

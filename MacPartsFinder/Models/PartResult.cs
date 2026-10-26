@@ -14,6 +14,8 @@ public class PartResult
     public string Description { get; set; } = "";
     /// <summary>Kind of part, e.g. "Analog to Digital Converters - ADC" - the supplier's own category wording.</summary>
     public string Category { get; set; } = "";
+    /// <summary>Package / case, e.g. "8-SOIC" - the supplier's own wording. Empty when the supplier doesn't give it.</summary>
+    public string Package { get; set; } = "";
 
     /// <summary>Quantity in stock, or null when the supplier didn't say.</summary>
     public long? Stock { get; set; }

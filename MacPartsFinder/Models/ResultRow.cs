@@ -13,6 +13,16 @@ public sealed class ResultRow : INotifyPropertyChanged
     public string Manufacturer { get; init; } = "";
     public string Description { get; init; } = "";
     public string Type { get; init; } = "";
+
+    // Package: the supplier's own, or borrowed from another supplier's row with the same manufacturer part no.
+    private string _package = "";
+    public string Package { get => _package; set => Set(ref _package, value); }
+    /// <summary>Supplier the package was borrowed from; "" = the row's own (shown in orange when borrowed).</summary>
+    public string PackageFrom { get; set; } = "";
+    /// <summary>Tooltip on a borrowed package: whose it is (null = none).</summary>
+    public string? PackageTip => PackageFrom.Length == 0 ? null
+        : $"{Supplier} doesn't give the package - this is {PackageFrom}'s, for the same manufacturer part number ({MfrPartNo}).";
+
     public long? Stock { get; init; }
 
     // Price, Cur and Price breaks: the supplier's own, or converted when "Prices in GBP" is ticked.
@@ -51,6 +61,9 @@ public sealed class ResultRow : INotifyPropertyChanged
     /// <summary>Hidden order key: supplier's place in the supplier list, then the row's number within that supplier.
     /// Sorting by Supplier uses it: every supplier's rows together, loaded-more ones included.</summary>
     public int Seq { get; init; }
+    /// <summary>The supplier's place in the supplier list (Seq without the row number), so "Supplier, then Price"
+    /// sorts the prices within each supplier.</summary>
+    public int SupplierRank { get; init; }
     /// <summary>Hidden default order: the search first, then each Load more batch at the end - each grouped by supplier.</summary>
     public long Order { get; init; }
 

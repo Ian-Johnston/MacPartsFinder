@@ -27,7 +27,7 @@ namespace MacPartsFinder;
 public partial class MainWindow : Window
 {
     // ==== THE version number - change it here for each release (to match the vX.Y.Z tag Release.bat makes) ====
-    public const string AppVersion = "V1.0.1";
+    public const string AppVersion = "V1.0.2";
     private const string TitleSuffix = "(Free for Non-Commercial Use • Support MacPartsFinder - see About)";
 
     private AppSettings _settings;
@@ -41,6 +41,8 @@ public partial class MainWindow : Window
     private readonly ImageCache _images = new();
     // First photo seen for each manufacturer part no., so suppliers without photos (Mouser) can borrow one.
     private readonly Dictionary<string, (string Thumb, string Large)> _imagesByMpn = new();
+    // Package by manufacturer part no., so rows without one (Mouser's search never gives it) can borrow it.
+    private readonly Dictionary<string, (string Package, string Supplier)> _packagesByMpn = new();
 
     private const double ThumbRowHeight = ImageCache.ThumbSize + 4;
     private const double PlainRowHeight = 22;
@@ -83,6 +85,8 @@ public partial class MainWindow : Window
         foreach (var col in gridResults.Columns)
         {
             col.CellStyleClasses.Add("gl");
+            // (CanUserSort isn't reliable this early, so every column gets one; the photo column can't be sorted anyway.)
+            if (string.IsNullOrEmpty(col.SortMemberPath)) col.SortMemberPath = SortProperty(ColumnName(col));
         }
         AddColumnHeaderTips();
         _defaultColumns = CurrentColumnLayout();
@@ -449,6 +453,8 @@ public partial class MainWindow : Window
         { "Manufacturer", "Who makes the part." },
         { "Type", "Kind of part, in the supplier's own words (its category).\nBlank for website links, and for the odd part a supplier hasn't categorised." },
         { "Description", "Supplier's description of the part." },
+        { "Package", "Package / case, e.g. 8-SOIC, TSSOP, SO8 - in the supplier's own wording.\nFrom DigiKey, Farnell, CPC, Newark and TME (from its description). Mouser's search doesn't give it,\n" +
+                     "so Mouser rows borrow it (in orange) from another supplier's listing of exactly the same manufacturer part number." },
         { "Stock", "Quantity in stock now. Green = in stock, grey row = none." },
         { "UnitPrice", "Price each at the lowest price break (usually qty 1)." },
         { "Currency", "Currency of the prices in this row." },
@@ -467,14 +473,16 @@ public partial class MainWindow : Window
             if (col.Tag is not string name || !HeaderTips.TryGetValue(name, out var tip)) continue;
             // (A Header of "#" doesn't survive the XAML, so the # column's is set here.)
             var header = new TextBlock { Text = name == "No" ? "#" : col.Header as string ?? "" };
-            ToolTip.SetTip(header, tip + "\nClick to sort.");
+            ToolTip.SetTip(header, tip + "\n" + SortHint);
             col.Header = header;
         }
     }
 
     private static string ColumnName(DataGridColumn c) => c.Tag as string ?? "";
 
-    private static string HeaderText(DataGridColumn c) => c.Header as string ?? (c.Header as TextBlock)?.Text ?? "";
+    /// <summary>The column's header, without the sort level number (e.g. "Supplier ¹" gives "Supplier").</summary>
+    private static string HeaderText(DataGridColumn c) =>
+        (c.Header as string ?? (c.Header as TextBlock)?.Text ?? "").TrimEnd(LevelDigits.ToCharArray()).TrimEnd();
 
     private DataGridColumn Column(string name) => gridResults.Columns.First(c => ColumnName(c) == name);
 
@@ -572,6 +580,7 @@ public partial class MainWindow : Window
             Manufacturer = p.Manufacturer,
             Description = p.Description,
             Type = p.Category,
+            Package = p.Package,
             Stock = p.Stock,
             UnitPrice = p.UnitPrice,
             Currency = p.Currency,
@@ -592,6 +601,7 @@ public partial class MainWindow : Window
             LargeImageUrl = p.LargeImageUrl,
             LinkOnly = p.IsLinkOnly,
             Seq = seq,
+            SupplierRank = seq / SeqPerSupplier,
             Order = _batch * OrderPerBatch + seq
             // No - given when the search / Load more finishes
         };
@@ -603,7 +613,28 @@ public partial class MainWindow : Window
         {
             _imagesByMpn[key] = (p.ImageUrl, p.LargeImageUrl.Length > 0 ? p.LargeImageUrl : p.ImageUrl);
         }
+        if (p.Package.Length > 0 && key.Length > 0 && !_packagesByMpn.ContainsKey(key))
+        {
+            _packagesByMpn[key] = (p.Package, p.Supplier);
+        }
         return row;
+    }
+
+    /// <summary>
+    /// Rows with no package (Mouser's search never gives one) take it from another supplier's row with exactly the
+    /// same manufacturer part number. Kept in the row, so sorting and Filter include it; shown in its own colour.
+    /// </summary>
+    private void BorrowPackages()
+    {
+        foreach (var r in _rows)
+        {
+            if (r.LinkOnly || r.Package.Length > 0) continue;
+            if (_packagesByMpn.TryGetValue(MpnKey(r.MfrPartNo), out var found) && found.Supplier != r.Supplier)
+            {
+                r.PackageFrom = found.Supplier;
+                r.Package = found.Package;
+            }
+        }
     }
 
     private int _nextRowNo = 1;
@@ -643,7 +674,7 @@ public partial class MainWindow : Window
         var f = (txtFilter.Text ?? "").Trim();
         if (f.Length > 0)
         {
-            return new[] { r.MfrPartNo, r.Description, r.Type, r.Manufacturer, r.Supplier, r.SupplierPartNo }
+            return new[] { r.MfrPartNo, r.Description, r.Type, r.Package, r.Manufacturer, r.Supplier, r.SupplierPartNo }
                 .Any(v => v.IndexOf(f, StringComparison.OrdinalIgnoreCase) >= 0);
         }
         return true;
@@ -747,6 +778,7 @@ public partial class MainWindow : Window
             "Manufacturer" => r.Manufacturer,
             "Type" => r.Type,
             "Description" => r.Description,
+            "Package" => r.Package,
             "Stock" => r.Stock,
             "UnitPrice" => r.UnitPrice,
             "Currency" => r.Currency,
@@ -772,6 +804,7 @@ public partial class MainWindow : Window
         e.Row.Classes.Set("nostock", !r.LinkOnly && r.Stock == 0);
         e.Row.Classes.Set("instock", !r.LinkOnly && r.Stock != 0);
         e.Row.Classes.Set("conv", !r.LinkOnly && r.Converted); // converted prices in purple
+        e.Row.Classes.Set("borrowedpkg", r.PackageFrom.Length > 0); // a package borrowed from another supplier, in orange
         // Photos are only fetched for rows that come into view.
         if (_settings.ShowThumbnails) EnsureThumb(r);
     }
@@ -783,6 +816,115 @@ public partial class MainWindow : Window
         if (c.GetSelfAndVisualAncestors().OfType<Control>().Any(a => a.Classes.Contains("thumb"))) return;
         if (c.FindAncestorOfType<DataGridRow>(includeSelf: true)?.DataContext is ResultRow r) OpenUrl(r.ProductUrl);
     }
+
+    #region Sorting by one or more columns
+
+    private const string SortHint = "Click to sort; Shift+click to sort by this as well; right-click for more.";
+
+    // The columns sorted by, in order (first = main sort). Empty = arrival order.
+    private readonly List<(string Column, bool Descending)> _sortKeys = new();
+    private bool _shiftClick;
+    private ContextMenu? _headerMenu;
+    private MenuItem? _mnuSortBy, _mnuThenSortBy, _mnuClearSort;
+    private string _headerMenuColumn = "";
+
+    /// <summary>What a column sorts on: Supplier by its place in the supplier list, Datasheet by its link,
+    /// the rest by their own values.</summary>
+    private static string SortProperty(string columnName) => columnName switch
+    {
+        "Supplier" => nameof(ResultRow.SupplierRank),
+        "MOQ" => nameof(ResultRow.Moq),
+        "Datasheet" => nameof(ResultRow.DatasheetUrl),
+        _ => columnName
+    };
+
+    private void GridResults_Sorting(object? sender, DataGridColumnEventArgs e)
+    {
+        // Header clicks are handled here, so several columns can be sorted at once.
+        e.Handled = true;
+        var name = ColumnName(e.Column);
+        if (_shiftClick) ThenSortBy(name); else SortBy(name);
+    }
+
+    /// <summary>Sort by just this column; if it's already the only sort, reverse it.</summary>
+    private void SortBy(string columnName)
+    {
+        var reverse = _sortKeys.Count == 1 && _sortKeys[0].Column == columnName && !_sortKeys[0].Descending;
+        _sortKeys.Clear();
+        _sortKeys.Add((columnName, reverse));
+        ApplySort();
+    }
+
+    /// <summary>Add this column as the next sort level; if it's already one, reverse that level.</summary>
+    private void ThenSortBy(string columnName)
+    {
+        var i = _sortKeys.FindIndex(k => k.Column == columnName);
+        if (i >= 0)
+            _sortKeys[i] = (columnName, !_sortKeys[i].Descending);
+        else
+            _sortKeys.Add((columnName, false));
+        ApplySort();
+    }
+
+    private void ClearSorting()
+    {
+        _sortKeys.Clear();
+        ApplySort();
+    }
+
+    /// <summary>Sorts the rows by every level in turn, then arrival order for anything still equal.</summary>
+    private void ApplySort()
+    {
+        // (Not inside DeferRefresh: the grid looks at the rows as each sort level changes, which a deferred view refuses.)
+        _view.SortDescriptions.Clear();
+        foreach (var k in _sortKeys)
+        {
+            _view.SortDescriptions.Add(DataGridSortDescription.FromPath(Column(k.Column).SortMemberPath,
+                k.Descending ? ListSortDirection.Descending : ListSortDirection.Ascending));
+        }
+        _view.SortDescriptions.Add(DataGridSortDescription.FromPath(nameof(ResultRow.Order)));
+        RefreshSortHeaders();
+    }
+
+    // Small level numbers added to header text when sorting by more than one column.
+    private const string LevelDigits = "¹²³⁴⁵⁶⁷⁸⁹";
+
+    /// <summary>A level number on each sorted header when there's more than one (the grid draws the arrows).</summary>
+    private void RefreshSortHeaders()
+    {
+        foreach (var col in gridResults.Columns)
+        {
+            if (col.Header is not TextBlock header) continue;
+            var text = HeaderText(col);
+            var i = _sortKeys.FindIndex(k => k.Column == ColumnName(col));
+            if (i >= 0 && _sortKeys.Count > 1 && i < LevelDigits.Length) text += " " + LevelDigits[i];
+            if (header.Text != text) header.Text = text;
+        }
+    }
+
+    private void ShowHeaderMenu(DataGridColumn col)
+    {
+        if (_headerMenu == null)
+        {
+            _mnuSortBy = new MenuItem();
+            _mnuSortBy.Click += (_, _) => SortBy(_headerMenuColumn);
+            _mnuThenSortBy = new MenuItem();
+            _mnuThenSortBy.Click += (_, _) => ThenSortBy(_headerMenuColumn);
+            _mnuClearSort = new MenuItem { Header = "Clear sorting" };
+            _mnuClearSort.Click += (_, _) => ClearSorting();
+            _headerMenu = new ContextMenu { ItemsSource = new Control[] { _mnuSortBy, _mnuThenSortBy, new Separator(), _mnuClearSort } };
+        }
+        _headerMenuColumn = ColumnName(col);
+        var header = HeaderText(col);
+        var level = _sortKeys.FindIndex(k => k.Column == _headerMenuColumn);
+        _mnuSortBy!.Header = $"Sort by {header}";
+        _mnuThenSortBy!.Header = level >= 0 ? $"Reverse {header} (sort level {level + 1})" : $"Next sort by {header}";
+        _mnuThenSortBy.IsEnabled = _sortKeys.Count > 0;
+        _mnuClearSort!.IsEnabled = _sortKeys.Count > 0;
+        _headerMenu.Open(gridResults);
+    }
+
+    #endregion
 
     private void GridResults_KeyDown(object? sender, KeyEventArgs e)
     {
@@ -823,13 +965,18 @@ public partial class MainWindow : Window
 
     private ResultRow? _menuRow;
     private bool _menuOnHeader;
+    private DataGridColumn? _menuHeaderColumn;
 
     private void GridResults_PointerPressed(object? sender, PointerPressedEventArgs e)
     {
+        // Shift+click on a header adds a sort level (the grid's Sorting event doesn't say which keys were down).
+        _shiftClick = (e.KeyModifiers & KeyModifiers.Shift) != 0;
         if (!e.GetCurrentPoint(gridResults).Properties.IsRightButtonPressed) return;
         var c = e.Source as Control;
-        // The part menu is for rows - not for a right-click on the column headers.
-        _menuOnHeader = c?.FindAncestorOfType<DataGridColumnHeader>(includeSelf: true) != null;
+        // The part menu is for rows - a right-click on the column headers gets the sort menu instead.
+        var header = c?.FindAncestorOfType<DataGridColumnHeader>(includeSelf: true);
+        _menuOnHeader = header != null;
+        _menuHeaderColumn = header == null ? null : gridResults.Columns.FirstOrDefault(col => ReferenceEquals(col.Header, header.Content));
         _menuRow = c?.FindAncestorOfType<DataGridRow>(includeSelf: true)?.DataContext as ResultRow;
         // Select the row under the mouse - unless it's already part of a multi-row selection, which is kept (for Remove).
         if (_menuRow != null && !gridResults.SelectedItems.Contains(_menuRow)) gridResults.SelectedItem = _menuRow;
@@ -843,6 +990,8 @@ public partial class MainWindow : Window
         if (_menuOnHeader || (row == null && removed == 0))
         {
             e.Cancel = true;
+            if (_menuOnHeader && _menuHeaderColumn is { CanUserSort: true } col)
+                Dispatcher.UIThread.Post(() => ShowHeaderMenu(col));
             return;
         }
         var selectedCount = gridResults.SelectedItems.Count;
@@ -1043,7 +1192,8 @@ public partial class MainWindow : Window
         ToolTip.SetTip(header, (qty > 0 ? $"Price each when buying {qty:#,##0} (from the price breaks)."
                                         : "Price each at the lowest price break (usually qty 1).") +
                                (Converting ? $"\nShown in {_settings.ConvertCurrency} (purple = converted, approximate)." : "") +
-                               "\nClick to sort.");
+                               "\n" + SortHint);
+        RefreshSortHeaders();
     }
 
     #region Prices in one currency
@@ -1327,8 +1477,9 @@ public partial class MainWindow : Window
                 st.RowCount++;
                 added.Add(AddResult(p, SeqFor(s, st.RowCount)));
             }
-            // Earlier rows (e.g. Mouser) may now be able to borrow a photo from these.
+            // Earlier rows (e.g. Mouser) may now be able to borrow a photo, and a package, from these.
             RefreshThumbs();
+            BorrowPackages();
             item.Status = st.RowCount == 0 ? "No matches" : "OK";
             item.Tip = $"{s.Name}: {st.RowCount} result(s)" +
                        (st.Total.HasValue ? $" of {st.Total} found." : ".") +

@@ -206,6 +206,7 @@ public class Element14Supplier : ApiSupplier
                 Manufacturer = p.GetStr("brandName").Length > 0 ? p.GetStr("brandName") : p.GetStr("vendorName"),
                 Description = p.GetStr("displayName"),
                 Category = TypeFromName(p.GetStr("displayName")),
+                Package = PackageOf(p),
                 Stock = stock,
                 StockInfo = lead.Length > 0 && lead != "0" ? $"Lead {lead} days" : "",
                 Currency = _currency,
@@ -235,6 +236,22 @@ public class Element14Supplier : ApiSupplier
             results.Add(r);
         }
         return new SearchPage(results, ToNullableInt(wrapper.GetNum("numberOfResults")));
+    }
+
+    /// <summary>
+    /// The package from the part's attributes: "IC Case / Package" (e.g. TSSOP) if there is one, else any other
+    /// "... Case Style" / "... Case / Package" attribute (transistors, diodes, capacitors...). Not "Packaging" (reels).
+    /// </summary>
+    private static string PackageOf(JToken p)
+    {
+        var attrs = p.GetArr("attributes")
+            .Select(a => (Label: a.GetStr("attributeLabel"), Value: a.GetStr("attributeValue")))
+            .Where(a => a.Value.Length > 0 && a.Value != "-").ToList();
+        var ic = attrs.FirstOrDefault(a => string.Equals(a.Label, "IC Case / Package", StringComparison.OrdinalIgnoreCase));
+        if (ic.Value != null) return ic.Value;
+        var other = attrs.FirstOrDefault(a => a.Label.Contains("Case Style", StringComparison.OrdinalIgnoreCase) ||
+                                              a.Label.Contains("Case / Package", StringComparison.OrdinalIgnoreCase));
+        return other.Value ?? "";
     }
 
     /// <summary>

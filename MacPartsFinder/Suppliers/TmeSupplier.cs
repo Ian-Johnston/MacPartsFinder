@@ -4,6 +4,7 @@ using System.Linq;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using Newtonsoft.Json;
@@ -157,6 +158,7 @@ public class TmeSupplier : ApiSupplier
                 Manufacturer = p.GetStr("manufacturer", "name"),
                 Description = p.GetStr("description"),
                 Category = CategoryOf(p),
+                Package = PackageFromDescription(p.GetStr("description")),
                 Currency = _currency,
                 MinOrderQty = ToNullableInt(p.GetNum("minimal_amount")),
                 Status = FirstText(p.GetPath("product_status")),
@@ -230,6 +232,23 @@ public class TmeSupplier : ApiSupplier
         if (c.Length == 0) c = p.GetStr("category_name");
         if (c.Length == 0) c = p.GetStr("description").Split(';')[0].Trim();
         return c;
+    }
+
+    // Package names as TME writes them in descriptions, e.g. "SO8", "TSSOP14", "DIP8", "SOT23-5", "TO92".
+    private static readonly Regex PackageWord = new(
+        @"^(SO|SOIC|SOP|SSOP|TSSOP|MSOP|VSSOP|QSOP|HTSSOP|DIP|PDIP|SDIP|QFN|DFN|VQFN|WQFN|TQFP|LQFP|QFP|PLCC|BGA|LGA|WLCSP|" +
+        @"SOT|SC|TO|DO|SMA|SMB|SMC|SOD|DPAK|D2PAK|MELF|MINIMELF)[\d\-]*[A-Z\d]*$",
+        RegexOptions.IgnoreCase);
+
+    /// <summary>TME has no package field in its search, but descriptions read e.g. "IC: operational amplifier; 1MHz; SO8; ..."</summary>
+    internal static string PackageFromDescription(string description)
+    {
+        foreach (var bit in description.Split(';'))
+        {
+            var word = bit.Trim();
+            if (word.Length >= 2 && word.Length <= 14 && PackageWord.IsMatch(word)) return word;
+        }
+        return "";
     }
 
     /// <summary>First text in a value that may be a string, an array of strings, or an array of objects.</summary>
