@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using Newtonsoft.Json;
 
 namespace MacPartsFinder;
@@ -75,7 +76,7 @@ public class AppSettings
     public string TmeCountry { get; set; } = "GB";
     public string TmeCurrency { get; set; } = "GBP";
 
-    // ---- Show every price in one currency (toolbar "Prices in GBP") ----
+    // ---- Show every price in one currency ("Prices in GBP" under the supplier list) ----
     public bool ConvertPrices { get; set; } = false;
     public string ConvertCurrency { get; set; } = ExchangeRates.DefaultCurrency();
     /// <summary>The last exchange rates fetched, and when - only fetched again after 12 hours.</summary>
@@ -84,6 +85,10 @@ public class AppSettings
     // ---- General ----
     public int MaxResults { get; set; } = 25;
     public bool InStockOnly { get; set; } = false;
+    /// <summary>Left panel "Active parts only": hide parts whose status says obsolete, discontinued etc.</summary>
+    public bool ActiveOnly { get; set; } = false;
+    /// <summary>Left panel: hide parts whose Status contains one of these (case ignored). Always <see cref="StatusFilterCount"/> long.</summary>
+    public List<StatusFilter> StatusFilters { get; set; } = DefaultStatusFilters();
     public bool ShowThumbnails { get; set; } = true;
     /// <summary>Older settings files only have this (ticked = Dark); kept so they still load the right theme.</summary>
     public bool DarkMode { get; set; } = false;
@@ -147,6 +152,10 @@ public class AppSettings
         }
         s ??= new AppSettings();
         s.LoadError = error;
+        s.StatusFilters ??= DefaultStatusFilters();
+        while (s.StatusFilters.Count < StatusFilterCount) s.StatusFilters.Add(new StatusFilter());
+        if (s.StatusFilters.Count > StatusFilterCount)
+            s.StatusFilters.RemoveRange(StatusFilterCount, s.StatusFilters.Count - StatusFilterCount);
         foreach (var f in SecretFields)
         {
             var value = Secrets.Get(f.Name);
@@ -168,6 +177,18 @@ public class AppSettings
             Secrets.Set(f.Name, value);
             _storedSecrets[f.Name] = value;
         }
+    }
+
+    public const int StatusFilterCount = 20;
+
+    /// <summary>The status words offered at first - all unticked - then blank rows for the user's own.</summary>
+    public static List<StatusFilter> DefaultStatusFilters()
+    {
+        var terms = new[] { "Obsolete", "NO_LONGER_MANUFACTURED", "NO_LONGER_STOCKED", "End of Life", "BLOCKED_FOR_ZBL_BACKORDERS",
+                            "Not For New Designs", "MOQ_VALID_WHILE_STOCKS_LAST", "Last Time Buy" };
+        var list = terms.Select(t => new StatusFilter { Term = t }).ToList();
+        while (list.Count < StatusFilterCount) list.Add(new StatusFilter());
+        return list;
     }
 
     public string GetSearchUrl(string supplierName)
@@ -205,6 +226,15 @@ public class WindowPlacement
     public int Height { get; set; }
     public bool Maximized { get; set; }
     public int SplitterDistance { get; set; }
+    /// <summary>Left panel: height of the supplier list above the filters. 0 = default.</summary>
+    public int LeftSplitterDistance { get; set; }
+}
+
+/// <summary>One left-panel row: hide parts whose Status contains Term (case ignored) while Hide is ticked.</summary>
+public class StatusFilter
+{
+    public string Term { get; set; } = "";
+    public bool Hide { get; set; }
 }
 
 public class ColumnLayout

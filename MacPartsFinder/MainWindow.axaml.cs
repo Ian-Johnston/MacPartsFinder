@@ -27,7 +27,7 @@ namespace MacPartsFinder;
 public partial class MainWindow : Window
 {
     // ==== THE version number - change it here for each release (to match the vX.Y.Z tag Release.bat makes) ====
-    public const string AppVersion = "V1.0.3";
+    public const string AppVersion = "V1.0.4";
     private const string TitleSuffix = "(Free for Non-Commercial Use • Support MacPartsFinder - see About)";
 
     private AppSettings _settings;
@@ -69,6 +69,8 @@ public partial class MainWindow : Window
         nudMax.Value = Math.Max(1, Math.Min(50, _settings.MaxResults));
         _loading = true;
         chkInStock.IsChecked = _settings.InStockOnly;
+        chkActive.IsChecked = _settings.ActiveOnly;
+        BuildStatusFilterRows();
         _loading = false;
         _settingConvert = true; // (no fetching while the window is still being set up)
         chkConvert.IsChecked = _settings.ConvertPrices;
@@ -168,6 +170,10 @@ public partial class MainWindow : Window
         {
             gridMain.ColumnDefinitions[0].Width = new GridLength(Math.Max(150, Math.Min(p.SplitterDistance, p.Width - 200)));
         }
+        if (p.LeftSplitterDistance > 0)
+        {
+            gridLeft.RowDefinitions[0].Height = new GridLength(Math.Max(80, Math.Min(p.LeftSplitterDistance, p.Height - 160)));
+        }
     }
 
     private WindowPlacement CurrentWindowPlacement()
@@ -179,7 +185,8 @@ public partial class MainWindow : Window
             Width = (int)_normalSize.Width,
             Height = (int)_normalSize.Height,
             Maximized = WindowState == WindowState.Maximized,
-            SplitterDistance = (int)gridMain.ColumnDefinitions[0].ActualWidth
+            SplitterDistance = (int)gridMain.ColumnDefinitions[0].ActualWidth,
+            LeftSplitterDistance = (int)gridLeft.RowDefinitions[0].ActualHeight
         };
     }
 
@@ -196,6 +203,7 @@ public partial class MainWindow : Window
                                       area.Y + (area.Height - (int)(Height * screen.Scaling)) / 2);
         }
         gridMain.ColumnDefinitions[0].Width = new GridLength(440);
+        gridLeft.RowDefinitions[0].Height = new GridLength(300);
         ApplyColumnLayout(_defaultColumns);
     }
 
@@ -206,6 +214,8 @@ public partial class MainWindow : Window
         _settings.ResultColumns = CurrentColumnLayout();
         _settings.MaxResults = MaxPerSupplier;
         _settings.InStockOnly = chkInStock.IsChecked == true;
+        _settings.ActiveOnly = chkActive.IsChecked == true;
+        _settings.StatusFilters = _statusRows.Select(r => new StatusFilter { Term = r.Box.Text ?? "", Hide = r.Check.IsChecked == true }).ToList();
         _settings.ConvertPrices = chkConvert.IsChecked == true;
         foreach (var row in _supplierRows)
         {
@@ -668,7 +678,7 @@ public partial class MainWindow : Window
         return _suppliers.IndexOf(s) * SeqPerSupplier + rowNumber;
     }
 
-    /// <summary>Whether a row passes the supplier ticks, In stock only, hidden Types and the Filter box.
+    /// <summary>Whether a row passes the supplier ticks, the filters under the supplier list, hidden Types and the Filter box.
     /// Website-link rows always stay (unless their supplier is unticked or they were removed).</summary>
     private bool RowVisible(ResultRow r)
     {
@@ -677,6 +687,9 @@ public partial class MainWindow : Window
         if (_supplierRows.Any(i => !i.IsChecked && i.Name == r.Supplier)) return false;
         if (r.LinkOnly) return true;
         if (chkInStock.IsChecked == true && !(r.Stock > 0)) return false;
+        // Active parts only / the ticked status rows (capitals ignored); parts with no status always stay.
+        if (chkActive.IsChecked == true && StatusContainsAny(r.Status, NotActiveWords)) return false;
+        if (StatusContainsAny(r.Status, HiddenStatusTerms())) return false;
         if (_hiddenTypes.Count > 0 && _hiddenTypes.Contains(r.Type.Trim())) return false;
         var f = (txtFilter.Text ?? "").Trim();
         if (f.Length > 0)
@@ -691,6 +704,23 @@ public partial class MainWindow : Window
     {
         _view.Refresh();
         UpdateCountStatus();
+    }
+
+    /// <summary>Status words that mean a part isn't active, for Active parts only.</summary>
+    private static readonly string[] NotActiveWords =
+        { "obsolete", "discontinued", "not recommended", "nrnd", "end of life", "eol", "last time", "no longer", "not for new" };
+
+    private static bool StatusContainsAny(string? status, IEnumerable<string> words)
+    {
+        if (string.IsNullOrWhiteSpace(status)) return false; // unknown - keep it
+        return words.Any(w => status.IndexOf(w, StringComparison.OrdinalIgnoreCase) >= 0);
+    }
+
+    /// <summary>The text of every ticked status row that has some.</summary>
+    private List<string> HiddenStatusTerms()
+    {
+        return _statusRows.Where(r => r.Check.IsChecked == true).Select(r => (r.Box.Text ?? "").Trim())
+            .Where(t => t.Length > 0).ToList();
     }
 
     /// <summary>Types… needs some parts to list, and shows how many types are hidden.</summary>
@@ -728,6 +758,7 @@ public partial class MainWindow : Window
 
     private void UpdateCountStatus()
     {
+        UpdateStatusTicks();
         UpdateTypesButton();
         UpdateTotalParts();
         var shown = _view.Count;
@@ -963,9 +994,83 @@ public partial class MainWindow : Window
         if ((sender as Control)?.DataContext is ResultRow r && r.DatasheetUrl.Length > 0) OpenUrl(r.DatasheetUrl);
     }
 
+    // (In stock only and Active parts only)
     private void ChkInStock_Changed(object? sender, RoutedEventArgs e)
     {
         if (!_loading) ApplyFilter();
+    }
+
+    // The left panel's status rows: tick box + the Status text to hide. Made in code - there are StatusFilterCount of them.
+    private readonly List<(CheckBox Check, TextBox Box, TextBlock Tick)> _statusRows = new();
+    private const double StatusBoxWidth = 290;
+
+    private void BuildStatusFilterRows()
+    {
+        foreach (var f in _settings.StatusFilters)
+        {
+            var term = f.Term ?? "";
+            var hasText = term.Trim().Length > 0;
+            var chk = new CheckBox
+            {
+                IsChecked = f.Hide && hasText, IsEnabled = hasText, MinWidth = 0, Padding = new Thickness(0),
+                VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center
+            };
+            var box = new TextBox
+            {
+                Text = term, Width = StatusBoxWidth, Margin = new Thickness(2, 0, 0, 0), PlaceholderText = "Status text to hide…"
+            };
+            var tick = new TextBlock();
+            tick.Classes.Add("tick");
+            ToolTip.SetTip(chk, "Tick to hide parts whose Status contains the text beside it.");
+            ToolTip.SetTip(box, "Type it as it appears in the Status column (capitals don't matter).\n" +
+                                "Parts whose Status contains this are hidden while the box beside it is ticked.");
+            var row = gridStatusRows.RowDefinitions.Count;
+            gridStatusRows.RowDefinitions.Add(new RowDefinition(GridLength.Auto));
+            Grid.SetRow(chk, row);
+            Grid.SetRow(box, row);
+            Grid.SetColumn(box, 1);
+            Grid.SetRow(tick, row);
+            Grid.SetColumn(tick, 2);
+            gridStatusRows.Children.Add(chk);
+            gridStatusRows.Children.Add(box);
+            gridStatusRows.Children.Add(tick);
+            chk.IsCheckedChanged += (_, _) => { if (!_loading) ApplyFilter(); };
+            box.TextChanged += (_, _) => StatusBoxChanged(chk, box);
+            box.LostFocus += (_, _) => StatusBoxLeft(chk, box);
+            _statusRows.Add((chk, box, tick));
+        }
+    }
+
+    /// <summary>Puts a green ✓ beside each ticked status row that is hiding at least one part of the current
+    /// results; hovering over it says how many.</summary>
+    private void UpdateStatusTicks()
+    {
+        if (_statusRows.Count == 0) return;
+        var statuses = _rows.Where(r => !r.LinkOnly && !r.Removed).Select(r => r.Status ?? "").ToList();
+        foreach (var r in _statusRows)
+        {
+            var term = (r.Box.Text ?? "").Trim();
+            var hiding = r.Check.IsChecked == true && term.Length > 0
+                ? statuses.Count(s => s.IndexOf(term, StringComparison.OrdinalIgnoreCase) >= 0)
+                : 0;
+            r.Tick.Text = hiding > 0 ? "✓" : "";
+            ToolTip.SetTip(r.Tick, hiding > 0 ? $"Hiding {hiding} part(s) whose Status contains \"{term}\"." : null);
+        }
+    }
+
+    /// <summary>Typing in a status box re-filters straight away when its row is ticked. Clearing it only
+    /// unticks and greys the tick box once the user leaves the box.</summary>
+    private void StatusBoxChanged(CheckBox chk, TextBox box)
+    {
+        if ((box.Text ?? "").Trim().Length > 0) chk.IsEnabled = true;
+        if (chk.IsChecked == true && !_loading) ApplyFilter();
+    }
+
+    private void StatusBoxLeft(CheckBox chk, TextBox box)
+    {
+        if ((box.Text ?? "").Trim().Length > 0) return;
+        chk.IsChecked = false;
+        chk.IsEnabled = false;
     }
 
     private void TxtFilter_TextChanged(object? sender, TextChangedEventArgs e)
@@ -990,6 +1095,7 @@ public partial class MainWindow : Window
         _menuOnHeader = header != null;
         _menuHeaderColumn = header == null ? null : gridResults.Columns.FirstOrDefault(col => ReferenceEquals(col.Header, header.Content));
         _menuRow = c?.FindAncestorOfType<DataGridRow>(includeSelf: true)?.DataContext as ResultRow;
+        _menuOnStatusCell = c?.FindAncestorOfType<DataGridCell>(includeSelf: true)?.Classes.Contains("status") == true;
         // Select the row under the mouse - unless it's already part of a multi-row selection, which is kept (for Remove).
         if (_menuRow != null && !gridResults.SelectedItems.Contains(_menuRow)) gridResults.SelectedItem = _menuRow;
     }
@@ -1017,6 +1123,36 @@ public partial class MainWindow : Window
         mnuRemoveRows.Header = selectedCount > 1 ? $"Remove {selectedCount} rows from results" : "Remove from results";
         mnuRestoreRows.IsEnabled = removed > 0;
         mnuRestoreRows.Header = removed > 0 ? $"Restore removed rows ({removed})" : "Restore removed rows";
+
+        // Right-click on a Status cell that has some text: offer to hide every part with that status.
+        _menuStatus = _menuOnStatusCell && row != null && !row.LinkOnly ? (row.Status ?? "").Trim() : "";
+        mnuSep3.IsVisible = _menuStatus.Length > 0;
+        mnuHideStatus.IsVisible = _menuStatus.Length > 0;
+        var shown = _menuStatus.Length > 40 ? _menuStatus.Substring(0, 40) + "…" : _menuStatus;
+        mnuHideStatus.Header = $"Hide parts with Status \"{shown.Replace("_", "__")}\"";
+    }
+
+    // Whether the right-click was on a Status cell, and that cell's text, for Hide parts with this Status ("" = none).
+    private bool _menuOnStatusCell;
+    private string _menuStatus = "";
+
+    /// <summary>Ticks the left-panel row holding this status, or puts it in the first empty row and ticks that.</summary>
+    private async void MnuHideStatus_Click(object? sender, RoutedEventArgs e)
+    {
+        if (_menuStatus.Length == 0) return;
+        var status = _menuStatus;
+        var target = _statusRows.FirstOrDefault(r => string.Equals((r.Box.Text ?? "").Trim(), status, StringComparison.OrdinalIgnoreCase));
+        if (target.Box == null) target = _statusRows.FirstOrDefault(r => (r.Box.Text ?? "").Trim().Length == 0);
+        if (target.Box == null)
+        {
+            await MessageBox.Show(this, $"All {_statusRows.Count} Status rows under the supplier list are in use.\n" +
+                                        "Clear one (or change its text), then try again.", Title ?? "");
+            return;
+        }
+        if ((target.Box.Text ?? "").Trim().Length == 0) target.Box.Text = status;
+        target.Check.IsEnabled = true;
+        target.Check.IsChecked = true;
+        target.Box.BringIntoView();
     }
 
     private ResultRow? MenuRow => _menuRow ?? gridResults.SelectedItem as ResultRow;
@@ -1155,6 +1291,8 @@ public partial class MainWindow : Window
         if (found == 0 || showing > 0) return "";
         var why = new List<string>();
         if (chkInStock.IsChecked == true) why.Add("In stock only (none are in stock)");
+        if (chkActive.IsChecked == true) why.Add("Active parts only");
+        if (HiddenStatusTerms().Count > 0) why.Add("the ticked Status filters");
         if ((txtFilter.Text ?? "").Trim().Length > 0) why.Add("the Filter box");
         if (_hiddenTypes.Count > 0) why.Add("hidden Types");
         if (_supplierRows.Any(i => !i.IsChecked)) why.Add("unticked suppliers");

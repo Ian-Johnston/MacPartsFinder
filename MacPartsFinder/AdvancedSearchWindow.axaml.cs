@@ -75,7 +75,6 @@ public partial class AdvancedSearchWindow : Window
         cboMode.SelectedIndex = (int)o.Mode;
         chkInStock.IsChecked = o.InStockOnly;
         chkRohs.IsChecked = o.RohsOnly;
-        chkActive.IsChecked = o.ActiveOnly;
         txtMaker.Text = o.ManufacturerContains;
         txtPartNo.Text = o.PartNoContains;
         txtContains.Text = o.MustContain;
@@ -139,7 +138,6 @@ public partial class AdvancedSearchWindow : Window
             MaxResults = (int)(nudMax.Value ?? 25),
             InStockOnly = chkInStock.IsChecked == true,
             RohsOnly = chkRohs.IsChecked == true,
-            ActiveOnly = chkActive.IsChecked == true,
             ManufacturerContains = (txtMaker.Text ?? "").Trim(),
             PartNoContains = partNo,
             MustContain = mustContain,

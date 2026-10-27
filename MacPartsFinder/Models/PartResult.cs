@@ -86,12 +86,11 @@ public class AdvancedSearchOptions
     public SearchMode Mode { get; set; } = SearchMode.Keyword;
     public int MaxResults { get; set; } = 25;
 
-    // Applied by the suppliers
+    // Applied by the suppliers. (Active parts only is on the main window's left panel, applied live to the grid.)
     public bool InStockOnly { get; set; }
     public bool RohsOnly { get; set; }
 
     // Applied by the app to what comes back
-    public bool ActiveOnly { get; set; }
     public string ManufacturerContains { get; set; } = "";
     /// <summary>Only parts whose manufacturer part number contains this (case and spaces ignored), e.g. 931G.</summary>
     public string PartNoContains { get; set; } = "";
@@ -127,7 +126,6 @@ public class AdvancedSearchOptions
         }
         if (InStockOnly) bits.Add("in stock");
         if (RohsOnly) bits.Add("RoHS");
-        if (ActiveOnly) bits.Add("active only");
         if (ManufacturerContains.Trim().Length > 0) bits.Add($"maker \"{ManufacturerContains.Trim()}\"");
         if (PartNoContains.Trim().Length > 0) bits.Add($"part no. contains \"{PartNoContains.Trim()}\"");
         if (WordsToCheck.Length > 0) bits.Add($"contains \"{WordsToCheck}\"");
@@ -141,7 +139,7 @@ public class AdvancedSearchOptions
 
     /// <summary>True if any of the app-side filters are set.</summary>
     public bool HasAppFilters =>
-        ActiveOnly || ManufacturerContains.Trim().Length > 0 || PartNoContains.Trim().Length > 0 || WordsToCheck.Length > 0 ||
+        ManufacturerContains.Trim().Length > 0 || PartNoContains.Trim().Length > 0 || WordsToCheck.Length > 0 ||
         Quantity > 0 || MaxUnitPrice.HasValue;
 
     /// <summary>App-side filters. Website-link rows always pass.</summary>
@@ -150,7 +148,6 @@ public class AdvancedSearchOptions
     public bool Matches(PartResult p, Func<decimal, string, decimal>? toShownCurrency = null)
     {
         if (p.IsLinkOnly) return true;
-        if (ActiveOnly && IsNotActive(p.Status)) return false;
         if (ManufacturerContains.Trim().Length > 0 &&
             p.Manufacturer.IndexOf(ManufacturerContains.Trim(), StringComparison.OrdinalIgnoreCase) < 0) return false;
         if (PartNoContains.Trim().Length > 0 &&
@@ -187,16 +184,5 @@ public class AdvancedSearchOptions
     private static string NoSpaces(string? s)
     {
         return (s ?? "").Replace(" ", "");
-    }
-
-    private static bool IsNotActive(string status)
-    {
-        if (string.IsNullOrWhiteSpace(status)) return false; // unknown - keep it
-        foreach (var word in new[] { "obsolete", "discontinued", "not recommended", "nrnd", "end of life", "eol",
-                                     "last time", "no longer", "not for new" })
-        {
-            if (status.IndexOf(word, StringComparison.OrdinalIgnoreCase) >= 0) return true;
-        }
-        return false;
     }
 }
