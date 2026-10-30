@@ -165,6 +165,11 @@
                          ToolTip.Tip="Narrow the current results as you type.&#10;Matches supplier, supplier part no., mfr part no., manufacturer and description." />
                 <Button x:Name="btnExport" Content="Export CSV…" Click="BtnExport_Click"
                         ToolTip.Tip="Save the rows currently shown to a CSV file (opens in Excel or Numbers)." />
+                <Button x:Name="btnAddToBom" Content="Add to BOM" IsEnabled="False" Click="AddToBom_Click"
+                        ToolTip.Tip="Add the selected parts to the BOM (or right-click them > Add to BOM)." />
+                <!-- Text set in code: BOM (5)… -->
+                <Button x:Name="btnBom" Content="BOM (0)…" Click="BtnBom_Click"
+                        ToolTip.Tip="Show the BOM: the parts you've added, with quantities, totals and links for buying." />
                 <Button x:Name="btnSettings" Content="Settings…" Click="BtnSettings_Click"
                         ToolTip.Tip="API keys, supplier search URLs, your own suppliers, photos, dark mode and window layout." />
             </WrapPanel>
@@ -258,9 +263,13 @@
             <DataGrid x:Name="gridResults" IsReadOnly="True" SelectionMode="Extended"
                       CanUserReorderColumns="True" CanUserResizeColumns="True" CanUserSortColumns="True"
                       FrozenColumnCount="1" HeadersVisibility="Column" GridLinesVisibility="Vertical"
-                      Sorting="GridResults_Sorting" LoadingRow="GridResults_LoadingRow" DoubleTapped="GridResults_DoubleTapped" KeyDown="GridResults_KeyDown">
+                      Sorting="GridResults_Sorting" LoadingRow="GridResults_LoadingRow" DoubleTapped="GridResults_DoubleTapped" KeyDown="GridResults_KeyDown"
+                      SelectionChanged="GridResults_SelectionChanged">
                 <DataGrid.ContextMenu>
                     <ContextMenu x:Name="cmsResults" Opening="CmsResults_Opening">
+                        <!-- Header set in code: Add 3 rows to BOM -->
+                        <MenuItem x:Name="mnuAddToBom" Header="Add to BOM" Click="AddToBom_Click" />
+                        <Separator />
                         <MenuItem x:Name="mnuOpenProduct" Header="Open product page" Click="MnuOpenProduct_Click" />
                         <MenuItem x:Name="mnuOpenDatasheet" Header="Open datasheet" Click="MnuOpenDatasheet_Click" />
                         <Separator />

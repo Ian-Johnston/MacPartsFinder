@@ -27,7 +27,7 @@ namespace MacPartsFinder;
 public partial class MainWindow : Window
 {
     // ==== THE version number - change it here for each release (to match the vX.Y.Z tag Release.bat makes) ====
-    public const string AppVersion = "V1.0.5";
+    public const string AppVersion = "V1.0.6";
     private const string TitleSuffix = "(Free for Non-Commercial Use • Support MacPartsFinder - see About)";
 
     private AppSettings _settings;
@@ -101,6 +101,7 @@ public partial class MainWindow : Window
         RebuildSuppliers();
         ApplyFilter();
         SetUpRecentSearches();
+        CreateBomWindow();
 
         // Right-click selects the row under the mouse first (for the menus), as in WinPartsFinder.
         gridResults.AddHandler(PointerPressedEvent, GridResults_PointerPressed, RoutingStrategies.Tunnel, handledEventsToo: true);
@@ -140,12 +141,24 @@ public partial class MainWindow : Window
             HideSuggestions();
         };
         Deactivated += (_, _) => HideSuggestions();
-        Closing += (_, _) =>
+        Closing += async (_, e) =>
         {
+            // Unsaved BOM changes: Save / Don't Save / Cancel (Cancel keeps the app open).
+            if (!_bomAnswered && _bomWindow.HasUnsavedChanges)
+            {
+                e.Cancel = true;
+                ShowBomWindow();
+                if (!await _bomWindow.ConfirmDiscard()) return;
+                _bomAnswered = true;
+                Close();
+                return;
+            }
             _cts?.Cancel();
+            SaveBomSettings();
             SaveUiSettings(); // (closing - nowhere to show an error)
             _help?.Close();
             _photoPopup?.Close();
+            _bomWindow.CloseForGood();
         };
     }
 
@@ -1113,6 +1126,9 @@ public partial class MainWindow : Window
             return;
         }
         var selectedCount = gridResults.SelectedItems.Count;
+        var bomCount = SelectedPartRows().Count;
+        mnuAddToBom.IsEnabled = bomCount > 0;
+        mnuAddToBom.Header = bomCount > 1 ? $"Add {bomCount} rows to BOM" : "Add to BOM";
         mnuOpenProduct.IsEnabled = Field(row, "ProductUrl").Length > 0;
         mnuOpenDatasheet.IsEnabled = Field(row, "DatasheetUrl").Length > 0;
         mnuCopyMpn.IsEnabled = Field(row, "MfrPartNo").Length > 0;
@@ -1428,6 +1444,7 @@ public partial class MainWindow : Window
         }
         UpdatePriceHeader();
         _view.Refresh(); // re-sorts by the new prices, and redraws the purple
+        SetBomCurrency();
         if (!showStatus) return;
         if (Converting)
         {
@@ -1896,6 +1913,126 @@ public partial class MainWindow : Window
         };
         _photoPopup = popup;
         popup.Show(this);
+    }
+
+    #endregion
+
+    #region BOM
+
+    // The BOM window: made at startup (hidden), so parts can be added before it's ever opened.
+    private readonly BomWindow _bomWindow = new();
+    private bool _bomAnswered; // closing: the unsaved-BOM question has been answered
+
+    /// <summary>Every run starts with an empty BOM; saved ones are opened with Load in the BOM window.</summary>
+    private void CreateBomWindow()
+    {
+        _bomWindow.LastFolder = _settings.BomFolder;
+        _bomWindow.BomChanged += (_, _) => UpdateBomButtons();
+        SetBomCurrency();
+        UpdateBomButtons();
+    }
+
+    /// <summary>Remembers the BOM window's place and the last BOM folder (not the BOM itself).</summary>
+    private void SaveBomSettings()
+    {
+        if (_bomWindow.HasBeenShown) _settings.BomWindow = _bomWindow.Placement;
+        _settings.BomFolder = _bomWindow.LastFolder;
+    }
+
+    private void SetBomCurrency() => _bomWindow.SetCurrency(Converting ? _settings.ConvertCurrency : null, _settings.Rates);
+
+    /// <summary>Selected result rows that are real parts (website-link rows can't go in a BOM), top to bottom.</summary>
+    private List<ResultRow> SelectedPartRows()
+    {
+        var selected = gridResults.SelectedItems.OfType<ResultRow>().ToHashSet();
+        return _view.Cast<ResultRow>().Where(r => selected.Contains(r) && !r.LinkOnly).ToList();
+    }
+
+    private void UpdateBomButtons()
+    {
+        btnAddToBom.IsEnabled = SelectedPartRows().Count > 0;
+        btnBom.Content = $"BOM ({_bomWindow.Bom.Lines.Count})…";
+    }
+
+    private void GridResults_SelectionChanged(object? sender, SelectionChangedEventArgs e) =>
+        btnAddToBom.IsEnabled = SelectedPartRows().Count > 0;
+
+    private void AddToBom_Click(object? sender, RoutedEventArgs e)
+    {
+        var rows = SelectedPartRows();
+        if (rows.Count == 0) return;
+        var lines = rows.Select(ToBomLine).ToList();
+        var added = _bomWindow.AddLines(lines);
+        var more = lines.Count - added;
+        var total = _bomWindow.Bom.Lines.Count;
+        if (lines.Count == 1 && more == 1)
+        {
+            var l = _bomWindow.Bom.Lines.First(x => x.SamePart(lines[0]));
+            SetStatus($"{lines[0].SupplierPartNumber} was already in the BOM - quantity now {l.Qty}.");
+        }
+        else
+        {
+            SetStatus($"Added to the BOM: {added} new line{(added == 1 ? "" : "s")}" +
+                      (more > 0 ? $", {more} already there (quantity increased)" : "") +
+                      $". The BOM has {total} line{(total == 1 ? "" : "s")}.");
+        }
+    }
+
+    /// <summary>A BOM line from a result row, with the supplier's own price (not the converted one).
+    /// Quantity: the Advanced search quantity if one is set, but never less than the minimum order.</summary>
+    private BomLine ToBomLine(ResultRow row)
+    {
+        var qty = _active is { Quantity: > 0 } ? _active.Quantity : 1;
+        if (row.Moq.HasValue) qty = Math.Max(qty, row.Moq.Value);
+        return new BomLine
+        {
+            Qty = qty,
+            Supplier = row.Supplier,
+            SupplierPartNumber = row.SupplierPartNo,
+            ManufacturerPartNumber = row.MfrPartNo,
+            Manufacturer = row.Manufacturer,
+            Description = row.Description,
+            Footprint = row.Package,
+            UnitPrice = row.OrigUnitPrice,
+            Currency = row.OrigCurrency,
+            PriceBreaks = BomLine.ParseBreaks(row.BreaksRaw),
+            ProductUrl = row.ProductUrl,
+            Stock = row.Stock,
+            DateAdded = DateTime.Today
+        };
+    }
+
+    private void BtnBom_Click(object? sender, RoutedEventArgs e) => ShowBomWindow();
+
+    // The BOM window opens where it was last time (if that's still on a screen), else over the middle of this one.
+    private void ShowBomWindow()
+    {
+        if (_bomWindow.IsVisible)
+        {
+            if (_bomWindow.WindowState == WindowState.Minimized) _bomWindow.WindowState = WindowState.Normal;
+            _bomWindow.Activate();
+            return;
+        }
+        if (!_bomWindow.HasBeenShown)
+        {
+            var p = _settings.BomWindow;
+            var onScreen = p != null && p.Width >= _bomWindow.MinWidth && p.Height >= _bomWindow.MinHeight &&
+                           Screens.All.Any(s =>
+                           {
+                               var bounds = new PixelRect(p.X, p.Y, (int)(p.Width * s.Scaling), (int)(p.Height * s.Scaling));
+                               var overlap = s.WorkingArea.Intersect(bounds);
+                               return overlap.Width >= 200 && overlap.Height >= 100;
+                           });
+            if (onScreen)
+            {
+                _bomWindow.WindowStartupLocation = WindowStartupLocation.Manual;
+                _bomWindow.Position = new PixelPoint(p!.X, p.Y);
+                _bomWindow.Width = p.Width;
+                _bomWindow.Height = p.Height;
+            }
+        }
+        if (_bomWindow.Owner == null) _bomWindow.Show(this);
+        else _bomWindow.Show();
     }
 
     #endregion

@@ -1,0 +1,184 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="using:MacPartsFinder"
+        x:Class="MacPartsFinder.BomWindow"
+        Title="BOM – Untitled BOM"
+        Width="894" Height="481" MinWidth="560" MinHeight="360"
+        ShowInTaskbar="False" WindowStartupLocation="CenterOwner">
+
+    <!-- The ✕ that removes a line: dim red until the mouse is over it (darker red in the dark themes) -->
+    <Window.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.ThemeDictionaries>
+                <ResourceDictionary x:Key="Light">
+                    <SolidColorBrush x:Key="DeleteDimBrush" Color="#D27878" />
+                </ResourceDictionary>
+                <ResourceDictionary x:Key="Dark">
+                    <SolidColorBrush x:Key="DeleteDimBrush" Color="#965050" />
+                </ResourceDictionary>
+            </ResourceDictionary.ThemeDictionaries>
+        </ResourceDictionary>
+    </Window.Resources>
+
+    <Window.Styles>
+        <Style Selector="Button">
+            <Setter Property="HorizontalContentAlignment" Value="Center" />
+            <Setter Property="MinWidth" Value="75" />
+            <Setter Property="Padding" Value="8,3" />
+        </Style>
+        <Style Selector="DataGridCell.right">
+            <Setter Property="HorizontalContentAlignment" Value="Right" />
+        </Style>
+        <Style Selector="HyperlinkButton">
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+        <Style Selector="DataGrid#gridBom CheckBox">
+            <Setter Property="MinHeight" Value="0" />
+            <Setter Property="MinWidth" Value="0" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="HorizontalAlignment" Value="Center" />
+        </Style>
+
+        <!-- Unticked lines greyed out; converted prices purple, as in the results -->
+        <Style Selector="DataGridRow.off DataGridCell">
+            <Setter Property="Foreground" Value="{DynamicResource MutedTextBrush}" />
+        </Style>
+        <Style Selector="DataGridRow.conv DataGridCell.price">
+            <Setter Property="Foreground" Value="{DynamicResource ConvertedTextBrush}" />
+        </Style>
+
+        <!-- Tooltips: part details, prices and breaks, and what the tick box, Qty and link do -->
+        <Style Selector="DataGrid#gridBom DataGridCell.info" x:DataType="local:BomRow">
+            <Setter Property="ToolTip.Tip" Value="{Binding InfoTip}" />
+        </Style>
+        <Style Selector="DataGrid#gridBom DataGridCell.price" x:DataType="local:BomRow">
+            <Setter Property="ToolTip.Tip" Value="{Binding PriceTip}" />
+        </Style>
+        <Style Selector="DataGrid#gridBom DataGridCell.qty">
+            <Setter Property="ToolTip.Tip" Value="Click the selected line's quantity and type a new one, or use Qty − / Qty +" />
+        </Style>
+
+        <!-- The ✕ -->
+        <Style Selector="Button.del">
+            <Setter Property="MinWidth" Value="0" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Foreground" Value="{DynamicResource DeleteDimBrush}" />
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+            <Setter Property="VerticalAlignment" Value="Stretch" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+            <Setter Property="Cursor" Value="Hand" />
+        </Style>
+        <Style Selector="Button.del:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Foreground" Value="#EB3232" />
+            <Setter Property="FontWeight" Value="Bold" />
+        </Style>
+        <Style Selector="Button.del:pressed /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="Transparent" />
+        </Style>
+    </Window.Styles>
+
+    <DockPanel Margin="10,8,10,10">
+        <!-- BOM name -->
+        <DockPanel DockPanel.Dock="Top" Margin="0,0,0,8">
+            <TextBlock Text="BOM name:" VerticalAlignment="Center" Margin="0,0,8,0" />
+            <TextBox x:Name="txtName" TextChanged="TxtName_TextChanged"
+                     ToolTip.Tip="A name for this BOM - saved with it, and shown in the title bar." />
+        </DockPanel>
+
+        <!-- Totals, notes and buttons -->
+        <StackPanel DockPanel.Dock="Bottom" Spacing="6" Margin="0,8,0,0">
+            <DockPanel>
+                <TextBlock x:Name="lblGrandTotal" DockPanel.Dock="Right" FontWeight="Bold" Margin="12,0,0,0" Text="Grand total: 0.00" />
+                <TextBlock x:Name="lblSubtotals" TextTrimming="CharacterEllipsis" />
+            </DockPanel>
+            <TextBlock Text="Notes:" />
+            <TextBox x:Name="txtNotes" Height="64" AcceptsReturn="True" TextWrapping="Wrap" TextChanged="TxtNotes_TextChanged"
+                     ToolTip.Tip="Anything you want to keep with this BOM - saved with it." />
+            <DockPanel Margin="0,2,0,0">
+                <Button x:Name="btnOpenFolder" DockPanel.Dock="Right" Content="Open Folder" Click="BtnOpenFolder_Click"
+                        ToolTip.Tip="Show the BOM's file in Finder (or, before it's saved, the last BOM folder)." />
+                <WrapPanel>
+                    <WrapPanel.Styles>
+                        <Style Selector="Button">
+                            <Setter Property="Margin" Value="0,0,6,4" />
+                        </Style>
+                    </WrapPanel.Styles>
+                    <Button x:Name="btnNew" Content="New" Click="BtnNew_Click" ToolTip.Tip="Start an empty BOM." />
+                    <Button x:Name="btnLoad" Content="Load…" Click="BtnLoad_Click"
+                            ToolTip.Tip="Open a saved BOM (CSV) in place of this one. Other BOM CSVs load too." />
+                    <Button x:Name="btnSave" Content="Save" Click="BtnSave_Click" ToolTip.Tip="Save the BOM to its file (⌘S)." />
+                    <Button x:Name="btnSaveAs" Content="Save As…" Click="BtnSaveAs_Click" ToolTip.Tip="Save the BOM to a new file." />
+                    <Button x:Name="btnExportTxt" Content="Export TXT…" Click="BtnExportTxt_Click"
+                            ToolTip.Tip="Save an easy-to-read text copy: the parts in lined-up columns, grouped by supplier, with subtotals and the grand total." />
+                    <Button x:Name="btnRemove" Content="Remove" Click="BtnRemove_Click" IsEnabled="False"
+                            ToolTip.Tip="Remove the selected lines (⌘Z puts them back)." />
+                    <Button x:Name="btnQtyDown" Content="Qty −" MinWidth="60" Click="BtnQtyDown_Click" IsEnabled="False"
+                            ToolTip.Tip="One fewer of each selected line." />
+                    <Button x:Name="btnQtyUp" Content="Qty +" MinWidth="60" Click="BtnQtyUp_Click" IsEnabled="False"
+                            ToolTip.Tip="One more of each selected line." />
+                </WrapPanel>
+            </DockPanel>
+        </StackPanel>
+
+        <!-- The lines: only Qty can be typed in -->
+        <Border BorderThickness="1" BorderBrush="{DynamicResource SystemControlForegroundBaseMediumLowBrush}">
+            <DataGrid x:Name="gridBom" SelectionMode="Extended" HeadersVisibility="Column" GridLinesVisibility="Horizontal"
+                      CanUserSortColumns="False" CanUserReorderColumns="False" RowHeight="24"
+                      LoadingRow="GridBom_LoadingRow" SelectionChanged="GridBom_SelectionChanged"
+                      DoubleTapped="GridBom_DoubleTapped" CellEditEnded="GridBom_CellEditEnded">
+                <DataGrid.ContextMenu>
+                    <ContextMenu x:Name="cmsBom" Opening="CmsBom_Opening">
+                        <MenuItem x:Name="mnuOpenProduct" Header="Open product page" FontWeight="Bold" Click="MnuOpenProduct_Click" />
+                        <MenuItem x:Name="mnuCopyPartNo" Header="Copy supplier part no." Click="MnuCopyPartNo_Click" />
+                        <MenuItem x:Name="mnuCopyMpn" Header="Copy manufacturer part no." Click="MnuCopyMpn_Click" />
+                        <Separator />
+                        <MenuItem x:Name="mnuRemove" Header="Remove" Click="BtnRemove_Click" />
+                    </ContextMenu>
+                </DataGrid.ContextMenu>
+                <DataGrid.Columns>
+                    <DataGridTemplateColumn Header="" Width="32" CanUserResize="False" IsReadOnly="True" CellStyleClasses="noopen">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate x:DataType="local:BomRow">
+                                <CheckBox IsChecked="{Binding Include}" ToolTip.Tip="{Binding IncludeTip}" />
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
+                    <DataGridTextColumn Header="Supplier" Binding="{Binding Supplier}" x:DataType="local:BomRow" Width="90"
+                                        IsReadOnly="True" CellStyleClasses="info" />
+                    <DataGridTextColumn Header="Supplier Part No." Binding="{Binding PartNo}" x:DataType="local:BomRow" Width="130"
+                                        IsReadOnly="True" CellStyleClasses="info" />
+                    <DataGridTextColumn Header="Mfr Part No." Binding="{Binding Mpn}" x:DataType="local:BomRow" Width="120"
+                                        IsReadOnly="True" CellStyleClasses="info" />
+                    <DataGridTextColumn Header="Description" Binding="{Binding Description}" x:DataType="local:BomRow" Width="*" MinWidth="100"
+                                        IsReadOnly="True" CellStyleClasses="info" />
+                    <DataGridTextColumn Header="Qty" Binding="{Binding Qty}" x:DataType="local:BomRow" Width="58"
+                                        CellStyleClasses="right qty noopen" />
+                    <DataGridTextColumn Header="Unit Price" Binding="{Binding UnitPrice}" x:DataType="local:BomRow" Width="88"
+                                        IsReadOnly="True" CellStyleClasses="right price" />
+                    <DataGridTextColumn Header="Total" Binding="{Binding Total}" x:DataType="local:BomRow" Width="88"
+                                        IsReadOnly="True" CellStyleClasses="right price" />
+                    <DataGridTemplateColumn Header="Link" Width="52" IsReadOnly="True" CellStyleClasses="noopen">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate x:DataType="local:BomRow">
+                                <HyperlinkButton Content="Open" IsVisible="{Binding HasLink}" Click="Link_Click" Margin="4,0"
+                                                 ToolTip.Tip="{Binding LinkTip}" />
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
+                    <DataGridTemplateColumn Header="" Width="30" CanUserResize="False" IsReadOnly="True" CellStyleClasses="noopen">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate x:DataType="local:BomRow">
+                                <Button Classes="del" Content="✕" Click="Delete_Click" ToolTip.Tip="Remove this line (⌘Z puts it back)" />
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
+                </DataGrid.Columns>
+            </DataGrid>
+        </Border>
+    </DockPanel>
+</Window>

@@ -73,10 +73,11 @@ jobs:
 
       - uses: softprops/action-gh-release@v2
         with:
-          prerelease: true
+          prerelease: false
+          make_latest: true
           files: dmgs/*.dmg
           body: |
-            Test build of MacPartsFinder, the Mac edition of WinPartsFinder.
+            MacPartsFinder, the Mac edition of WinPartsFinder.
 
             **Download** (click to download straight away):
             - [MacPartsFinder-mac-arm64.dmg](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/MacPartsFinder-mac-arm64.dmg) - Apple Silicon Macs (M1 and later)
@@ -85,4 +86,4 @@ jobs:
             Needs macOS 15 (Sequoia) or later.
 
             Not signed by Apple yet, so the first time you open it, macOS will block it.
-            Go to **System Settings > Privacy & Security** and click **Open Anyway** - see the README for details.
+            See installation instructions on my webpage here - https://www.ianjohnston.com/index.php/projects/winpartsfinder

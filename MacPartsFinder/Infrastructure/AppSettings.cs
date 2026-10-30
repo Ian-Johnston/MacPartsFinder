@@ -110,6 +110,10 @@ public class AppSettings
     public List<CustomSupplier> CustomSuppliers { get; set; } = new();
     /// <summary>Main window size/position from last time; null = default.</summary>
     public WindowPlacement? MainWindow { get; set; }
+    /// <summary>BOM window size/position from last time; null = centred on the main window.</summary>
+    public WindowPlacement? BomWindow { get; set; }
+    /// <summary>Folder the last BOM was saved to or loaded from - where Load, Save As and Open Folder start.</summary>
+    public string BomFolder { get; set; } = "";
     /// <summary>Results grid column widths and order, keyed by column name.</summary>
     public Dictionary<string, ColumnLayout> ResultColumns { get; set; } = new();
     public Dictionary<string, bool> EnabledSuppliers { get; set; } = new();
