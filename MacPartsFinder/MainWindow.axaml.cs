@@ -27,7 +27,7 @@ namespace MacPartsFinder;
 public partial class MainWindow : Window
 {
     // ==== THE version number - change it here for each release (to match the vX.Y.Z tag Release.bat makes) ====
-    public const string AppVersion = "V1.0.6";
+    public const string AppVersion = "V1.0.7";
     private const string TitleSuffix = "(Free for Non-Commercial Use • Support MacPartsFinder - see About)";
 
     private AppSettings _settings;
@@ -1533,6 +1533,10 @@ public partial class MainWindow : Window
         public bool LastPageFull;        // fallback when no total is given
         public int RowCount;             // rows added to the grid (after removing duplicates)
         public int Duplicates;           // repeats the supplier sent that were skipped
+        public int Fetched;              // parts the supplier has sent so far (before duplicates and filters)
+        public int Batches;              // pages fetched: the search, then each Load more
+        public int PageSize;             // Max/supp. for this search
+        public bool LastAddedNothing;    // the last Load more added no new rows
         public readonly HashSet<string> Seen = new(StringComparer.OrdinalIgnoreCase);
 
         public bool HasMore => Total.HasValue ? NextOffset < Total.Value : LastPageFull;
@@ -1615,6 +1619,9 @@ public partial class MainWindow : Window
         {
             var page = await s.SearchAsync(st.Query, st.Mode, pageSize, st.NextOffset, st.Filters, ct);
             st.NextOffset += pageSize;
+            st.PageSize = pageSize;
+            st.Batches++;
+            st.Fetched += page.Parts.Count;
             st.Total = page.TotalAvailable;
             st.LastPageFull = page.Parts.Count >= pageSize;
             var before = st.RowCount;
@@ -1648,12 +1655,9 @@ public partial class MainWindow : Window
             RefreshThumbs();
             BorrowPackages();
             item.Status = st.RowCount == 0 ? "No matches" : "OK";
-            item.Tip = $"{s.Name}: {st.RowCount} result(s)" +
-                       (st.Total.HasValue ? $" of {st.Total} found." : ".") +
-                       (st.Duplicates > 0 ? $" {st.Duplicates} repeated by {s.Name} and skipped." : "") +
-                       (st.Filtered > 0 ? $" {st.Filtered} left out by the Advanced search filters." : "") +
-                       (HasMore(s) ? " Right-click > Load more for the next batch." : "");
-            if (!firstPage && st.RowCount == before) item.Status = "No more";
+            st.LastAddedNothing = !firstPage && st.RowCount == before;
+            if (st.LastAddedNothing) item.Status = "No more";
+            item.Tip = HitsToolTip(s, st);
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
@@ -1680,6 +1684,42 @@ public partial class MainWindow : Window
     {
         if (st.Total.HasValue && HasMore(s)) return $"{st.RowCount} / {st.Total}";
         return st.RowCount.ToString();
+    }
+
+    /// <summary>
+    /// The supplier row's tooltip: what its Hits numbers mean - how many match, how many have been fetched,
+    /// how many are shown and why the rest aren't, and whether Load more has more to get.
+    /// </summary>
+    private string HitsToolTip(Supplier s, PagingState st)
+    {
+        var lines = new List<string> { $"{s.Name} - Hits {HitsText(s, st)}" };
+        if (st.Total.HasValue) lines.Add($"{st.Total.Value:N0} part{(st.Total.Value == 1 ? "" : "s")} match \"{st.Query}\" at {s.Name}.");
+        if (HasMore(s))
+            lines.Add($"Fetched so far: {st.Fetched:N0}" + (st.Batches > 1 ? $" ({st.Batches} batches of {st.PageSize})." : "."));
+        else
+            lines.Add(st.Fetched == 0 ? "Nothing found." : $"All {st.Fetched:N0} have been fetched.");
+        if (st.Fetched > 0)
+        {
+            var shown = $"Shown: {st.RowCount:N0}";
+            if (st.Filtered > 0)
+            {
+                var filters = _active?.Describe() ?? "";
+                shown += $" - {st.Filtered:N0} left out by the Advanced search filters" + (filters.Length > 0 ? $" ({filters})." : ".");
+            }
+            else
+            {
+                shown += ".";
+            }
+            lines.Add(shown);
+        }
+        if (st.Duplicates > 0) lines.Add($"{st.Duplicates:N0} sent twice by {s.Name} and skipped.");
+        if (st.LastAddedNothing) lines.Add("The last Load more found nothing new that passed the filters.");
+        if (HasMore(s))
+        {
+            var left = st.Total.HasValue ? $"{Math.Max(0, st.Total.Value - st.Fetched):N0} more to fetch: " : "There may be more: ";
+            lines.Add(left + $"click Load more for the next {st.PageSize}.");
+        }
+        return string.Join(Environment.NewLine, lines);
     }
 
     private bool HasMore(Supplier s)

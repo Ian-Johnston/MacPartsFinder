@@ -203,7 +203,7 @@
             </Grid.Resources>
             <!-- Supplier list -->
             <Border Grid.Row="0" Classes="frame">
-            <DataGrid x:Name="gridSuppliers" IsReadOnly="True" CanUserSortColumns="False"
+            <DataGrid x:Name="gridSuppliers" IsReadOnly="True" CanUserSortColumns="False" CanUserResizeColumns="True"
                       SelectionMode="Single" HeadersVisibility="Column" GridLinesVisibility="Horizontal" RowHeight="22" FontSize="13"
                       LoadingRow="GridSuppliers_LoadingRow" DoubleTapped="GridSuppliers_DoubleTapped">
                 <DataGrid.ContextMenu>
@@ -225,9 +225,9 @@
                             </DataTemplate>
                         </DataGridTemplateColumn.CellTemplate>
                     </DataGridTemplateColumn>
-                    <DataGridTextColumn Header="Mode" Binding="{Binding ModeText}" x:DataType="local:SupplierRow" Width="96" />
+                    <DataGridTextColumn Header="Mode" Binding="{Binding ModeText}" x:DataType="local:SupplierRow" Width="84" />
                     <DataGridTextColumn Header="Status" Binding="{Binding Status}" x:DataType="local:SupplierRow" Width="88" />
-                    <DataGridTextColumn Header="Hits" Binding="{Binding Hits}" x:DataType="local:SupplierRow" Width="74" CellStyleClasses="right" />
+                    <DataGridTextColumn Header="Hits" Binding="{Binding Hits}" x:DataType="local:SupplierRow" Width="86" CellStyleClasses="right" />
                     <DataGridTextColumn Header="Time" Binding="{Binding Time}" x:DataType="local:SupplierRow" Width="*" />
                 </DataGrid.Columns>
             </DataGrid>
