@@ -17,6 +17,7 @@ using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Input.Platform;
 using Avalonia.Interactivity;
+using Avalonia.Media;
 using Avalonia.Platform.Storage;
 using Avalonia.Styling;
 using Avalonia.Threading;
@@ -27,7 +28,7 @@ namespace MacPartsFinder;
 public partial class MainWindow : Window
 {
     // ==== THE version number - change it here for each release (to match the vX.Y.Z tag Release.bat makes) ====
-    public const string AppVersion = "V1.0.9";
+    public const string AppVersion = "V1.0.10";
     private const string TitleSuffix = "(Free for Non-Commercial Use • Support MacPartsFinder - see About)";
 
     private AppSettings _settings;
@@ -104,6 +105,7 @@ public partial class MainWindow : Window
         ApplyFilter();
         SetUpRecentSearches();
         CreateBomWindow();
+        UpdateCollapseTab();
 
         // Right-click selects the row under the mouse first (for the menus), as in WinPartsFinder.
         gridResults.AddHandler(PointerPressedEvent, GridResults_PointerPressed, RoutingStrategies.Tunnel, handledEventsToo: true);
@@ -200,7 +202,7 @@ public partial class MainWindow : Window
             Width = (int)_normalSize.Width,
             Height = (int)_normalSize.Height,
             Maximized = WindowState == WindowState.Maximized,
-            SplitterDistance = (int)gridMain.ColumnDefinitions[0].ActualWidth,
+            SplitterDistance = _leftCollapsed ? (int)_expandedWidth : (int)gridMain.ColumnDefinitions[0].ActualWidth, // always starts open
             LeftSplitterDistance = (int)gridLeft.RowDefinitions[0].ActualHeight
         };
     }
@@ -217,6 +219,7 @@ public partial class MainWindow : Window
             Position = new PixelPoint(area.X + (area.Width - (int)(Width * screen.Scaling)) / 2,
                                       area.Y + (area.Height - (int)(Height * screen.Scaling)) / 2);
         }
+        SetLeftCollapsed(false);
         gridMain.ColumnDefinitions[0].Width = new GridLength(375);
         gridLeft.RowDefinitions[0].Height = new GridLength(300);
         ApplyColumnLayout(_defaultColumns);
@@ -308,6 +311,49 @@ public partial class MainWindow : Window
         }
         _loading = false;
         UpdateLoadMoreButton();
+    }
+
+    #endregion
+
+    #region Hiding the left side
+
+    // The pull-tab halfway down the main divider hides the supplier list and filters (the results then fill the window)
+    // and brings them back. The tab stays on screen while they're hidden, so there's always something to click.
+    private bool _leftCollapsed;
+    private double _expandedWidth = 375; // where the divider goes back to
+
+    private void BdrCollapse_PointerPressed(object? sender, PointerPressedEventArgs e)
+    {
+        if (!e.GetCurrentPoint(bdrCollapse).Properties.IsLeftButtonPressed) return;
+        SetLeftCollapsed(!_leftCollapsed);
+        e.Handled = true;
+    }
+
+    private void SetLeftCollapsed(bool collapse)
+    {
+        if (collapse == _leftCollapsed) return;
+        _leftCollapsed = collapse;
+        var column = gridMain.ColumnDefinitions[0];
+        if (collapse)
+        {
+            _expandedWidth = column.ActualWidth;
+            gridLeft.IsVisible = false; // so the supplier list isn't squeezed down to nothing
+            column.Width = new GridLength(0);
+        }
+        else
+        {
+            column.Width = new GridLength(Math.Max(150, Math.Min(_expandedWidth, gridMain.Bounds.Width - 200)));
+            gridLeft.IsVisible = true;
+        }
+        splitMain.IsEnabled = !collapse; // while hidden, the tab brings it back
+        UpdateCollapseTab();
+    }
+
+    /// <summary>Points the tab's arrow left to hide, right to show, with a tooltip to match.</summary>
+    private void UpdateCollapseTab()
+    {
+        pathCollapse.Data = Geometry.Parse(_leftCollapsed ? "M0,0 L0,10 L6,5 Z" : "M6,0 L6,10 L0,5 Z");
+        ToolTip.SetTip(bdrCollapse, _leftCollapsed ? "Show suppliers" : "Hide suppliers");
     }
 
     #endregion

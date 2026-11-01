@@ -108,6 +108,14 @@
             <Setter Property="BorderThickness" Value="1" />
             <Setter Property="BorderBrush" Value="{DynamicResource SystemControlForegroundBaseMediumLowBrush}" />
         </Style>
+        <!-- The pull-tab that hides and shows the supplier list: header colours, the list's hover colour under the mouse -->
+        <Style Selector="Border#bdrCollapse">
+            <Setter Property="Background" Value="{DynamicResource DataGridColumnHeaderBackgroundBrush}" />
+        </Style>
+        <!-- The hover colour is see-through, so it goes on an inner layer over the solid header colour -->
+        <Style Selector="Border#bdrCollapse:pointerover > Border">
+            <Setter Property="Background" Value="{DynamicResource SystemControlHighlightListLowBrush}" />
+        </Style>
 
         <!-- Results row lines: drawn under each real column's cells (class "gl", added in code), so they stop at the
              last column like WinPartsFinder's - the grid's own row line runs on across the empty space to the right. -->
@@ -263,7 +271,7 @@
             </Border>
             </Grid>
 
-            <GridSplitter Grid.Column="1" ResizeDirection="Columns" Background="Transparent" />
+            <GridSplitter x:Name="splitMain" Grid.Column="1" ResizeDirection="Columns" Background="Transparent" />
 
             <!-- Results -->
             <Border Grid.Column="2" Classes="frame">
@@ -350,6 +358,19 @@
                                         CellStyleClasses="status" />
                 </DataGrid.Columns>
             </DataGrid>
+            </Border>
+
+            <!-- A pull-tab halfway down the divider, sticking out over the edge of the results: hides the supplier list
+                 and filters (the results then fill the window) and brings them back. Arrow and tooltip set in code. -->
+            <Border x:Name="bdrCollapse" Grid.Column="1" Grid.ColumnSpan="2" Width="14" Height="46"
+                    HorizontalAlignment="Left" VerticalAlignment="Center" Cursor="Hand"
+                    CornerRadius="0,6,6,0" BorderThickness="0,1,1,1"
+                    BorderBrush="{DynamicResource SystemControlForegroundBaseMediumLowBrush}"
+                    PointerPressed="BdrCollapse_PointerPressed">
+                <Border CornerRadius="0,5,5,0" Background="Transparent">
+                    <Path x:Name="pathCollapse" Fill="{DynamicResource SystemControlForegroundBaseHighBrush}"
+                          HorizontalAlignment="Center" VerticalAlignment="Center" />
+                </Border>
             </Border>
         </Grid>
     </DockPanel>
