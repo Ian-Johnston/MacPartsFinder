@@ -27,6 +27,9 @@
                     <SolidColorBrush x:Key="BorrowedTextBrush" Color="#BE5F00" />
                     <!-- Grids: see-through in Light and Dark (as before); their own shade in the grey themes -->
                     <SolidColorBrush x:Key="AppListBackground" Color="Transparent" />
+                    <!-- Text box outlines: a faint line as on a Mac, not Fluent's 60% black -->
+                    <SolidColorBrush x:Key="TextControlBorderBrush" Color="#C4C4C4" />
+                    <SolidColorBrush x:Key="TextControlBorderBrushPointerOver" Color="#A0A0A0" />
                 </ResourceDictionary>
                 <ResourceDictionary x:Key="Dark">
                     <SolidColorBrush x:Key="LinkTextBrush" Color="#6EAFFF" />
@@ -35,6 +38,8 @@
                     <SolidColorBrush x:Key="ConvertedTextBrush" Color="#CD96FF" />
                     <SolidColorBrush x:Key="BorrowedTextBrush" Color="#FFAA46" />
                     <SolidColorBrush x:Key="AppListBackground" Color="Transparent" />
+                    <SolidColorBrush x:Key="TextControlBorderBrush" Color="#555555" />
+                    <SolidColorBrush x:Key="TextControlBorderBrushPointerOver" Color="#777777" />
                 </ResourceDictionary>
 
                 <!-- Soft grey (built on Light): light greys instead of bright white, with text and colours a touch darker so
@@ -56,6 +61,8 @@
                     <SolidColorBrush x:Key="TextControlBackgroundPointerOver" Color="#F2F2F2" />
                     <SolidColorBrush x:Key="TextControlBackgroundFocused" Color="#F4F4F4" />
                     <SolidColorBrush x:Key="TextControlForeground" Color="#181818" />
+                    <SolidColorBrush x:Key="TextControlBorderBrush" Color="#B4B4B4" />
+                    <SolidColorBrush x:Key="TextControlBorderBrushPointerOver" Color="#909090" />
                     <SolidColorBrush x:Key="ComboBoxBackground" Color="#EEEEEE" />
                     <SolidColorBrush x:Key="ComboBoxBackgroundPointerOver" Color="#F2F2F2" />
                     <SolidColorBrush x:Key="ComboBoxForeground" Color="#181818" />
@@ -89,6 +96,8 @@
                     <SolidColorBrush x:Key="TextControlBackgroundPointerOver" Color="#434A55" />
                     <SolidColorBrush x:Key="TextControlBackgroundFocused" Color="#353A43" />
                     <SolidColorBrush x:Key="TextControlForeground" Color="#DEE2E8" />
+                    <SolidColorBrush x:Key="TextControlBorderBrush" Color="#5C6370" />
+                    <SolidColorBrush x:Key="TextControlBorderBrushPointerOver" Color="#7A828F" />
                     <SolidColorBrush x:Key="ComboBoxBackground" Color="#3D434D" />
                     <SolidColorBrush x:Key="ComboBoxBackgroundPointerOver" Color="#434A55" />
                     <SolidColorBrush x:Key="ComboBoxForeground" Color="#DEE2E8" />
@@ -106,6 +115,8 @@
             </ResourceDictionary.ThemeDictionaries>
             <!-- 12px text throughout, like WinPartsFinder's 9pt Segoe UI (Fluent's default is 14px) -->
             <x:Double x:Key="ControlContentThemeFontSize">12</x:Double>
+            <!-- Typing in a text box: a 1px accent-coloured outline, not Fluent's 2px -->
+            <Thickness x:Key="TextControlBorderThemeThicknessFocused">1</Thickness>
         </ResourceDictionary>
     </Application.Resources>
 

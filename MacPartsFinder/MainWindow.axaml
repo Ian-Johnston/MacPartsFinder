@@ -2,7 +2,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:local="using:MacPartsFinder"
         x:Class="MacPartsFinder.MainWindow"
-        Width="1264" Height="681" MinWidth="800" MinHeight="400"
+        Width="1313" Height="742" MinWidth="800" MinHeight="400"
         WindowStartupLocation="CenterScreen"
         Title="MacPartsFinder">
 
@@ -125,6 +125,11 @@
         <Style Selector="DataGrid#gridResults DataGridColumnHeader:not(:disabled) /template/ Rectangle#HeaderLine">
             <Setter Property="IsVisible" Value="True" />
         </Style>
+        <!-- The blank filler header to the right of the last column: not drawn, so the headers end where the columns do -->
+        <Style Selector="DataGrid#gridResults DataGridColumnHeader:disabled">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="AreSeparatorsVisible" Value="False" />
+        </Style>
 
         <!-- Suggestions while typing: never take the keyboard from the Search box -->
         <Style Selector="ListBox#lstSuggest ListBoxItem">
@@ -138,8 +143,8 @@
         <!-- Toolbar: same order as WinPartsFinder -->
         <DockPanel x:Name="toolbar" DockPanel.Dock="Top" Margin="6,4,6,2">
             <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="4" VerticalAlignment="Top" Margin="6,2,0,2">
-                <Button x:Name="btnHelp" Content="Help…" Click="BtnHelp_Click" ToolTip.Tip="How to use MacPartsFinder." />
-                <Button x:Name="btnAbout" Content="About…" Click="BtnAbout_Click" ToolTip.Tip="Version, credits, licence and donate." />
+                <Button x:Name="btnHelp" Content="Help" Click="BtnHelp_Click" ToolTip.Tip="How to use MacPartsFinder." />
+                <Button x:Name="btnAbout" Content="About" Click="BtnAbout_Click" ToolTip.Tip="Version, credits, licence and donate." />
             </StackPanel>
             <WrapPanel x:Name="toolbarLeft">
                 <TextBlock Text="Search:" />
@@ -152,25 +157,25 @@
                                ToolTip.Tip="How many results to fetch from each supplier per search, and per Load more (up to 50).&#10;Fewer is faster. Each search or Load more uses one call of each supplier's daily API allowance." />
                 <Button x:Name="btnSearch" Content="Search" IsDefault="True" Click="BtnSearch_Click"
                         ToolTip.Tip="Search every ticked supplier at once (Return)." />
-                <Button x:Name="btnAdvanced" Content="Advanced…" Click="BtnAdvanced_Click"
+                <Button x:Name="btnAdvanced" Content="Advanced" Click="BtnAdvanced_Click"
                         ToolTip.Tip="Advanced search (⌘F): exact part number, supplier order code,&#10;RoHS, maker, part of a part no., quantity pricing, max price…" />
                 <Button x:Name="btnCancel" Content="Cancel" IsEnabled="False" Click="BtnCancel_Click"
                         ToolTip.Tip="Stop any searches still running." />
                 <Button x:Name="btnLoadMore" Content="Load more" IsEnabled="False" Click="BtnLoadMore_Click"
                         ToolTip.Tip="Fetch the next batch (Max/supp.) from every ticked supplier that has more - see Hits, e.g. 50 / 312.&#10;Uses one API call per supplier. New rows are added at the end and selected - click the Supplier header to group them.&#10;Right-click a supplier to load more from just that one." />
-                <Button x:Name="btnTypes" Content="Types…" IsEnabled="False" Click="BtnTypes_Click" Margin="8,2,4,2"
+                <Button x:Name="btnTypes" Content="Types" IsEnabled="False" Click="BtnTypes_Click" Margin="8,2,4,2"
                         ToolTip.Tip="After a search: tick or untick part types (categories) to show or hide them,&#10;e.g. hide Evaluation Kit and Flip-Flops. A new search shows every type again." />
                 <TextBlock Text="Filter:" />
                 <TextBox x:Name="txtFilter" Width="120" PlaceholderText="narrow results…" TextChanged="TxtFilter_TextChanged"
                          ToolTip.Tip="Narrow the current results as you type.&#10;Matches supplier, supplier part no., mfr part no., manufacturer and description." />
-                <Button x:Name="btnExport" Content="Export CSV…" Click="BtnExport_Click"
+                <Button x:Name="btnExport" Content="Export CSV" Click="BtnExport_Click"
                         ToolTip.Tip="Save the rows currently shown to a CSV file (opens in Excel or Numbers)." />
                 <Button x:Name="btnAddToBom" Content="Add to BOM" IsEnabled="False" Click="AddToBom_Click"
                         ToolTip.Tip="Add the selected parts to the BOM (or right-click them > Add to BOM)." />
                 <!-- Text set in code: BOM (5)… -->
-                <Button x:Name="btnBom" Content="BOM (0)…" Click="BtnBom_Click"
+                <Button x:Name="btnBom" Content="BOM (0)" Click="BtnBom_Click"
                         ToolTip.Tip="Show the BOM: the parts you've added, with quantities, totals and links for buying." />
-                <Button x:Name="btnSettings" Content="Settings…" Click="BtnSettings_Click"
+                <Button x:Name="btnSettings" Content="Settings" Click="BtnSettings_Click"
                         ToolTip.Tip="API keys, supplier search URLs, your own suppliers, photos, dark mode and window layout." />
             </WrapPanel>
 
@@ -192,7 +197,7 @@
         </Border>
 
         <!-- Supplier list and results, each in its own frame with the divider between (as in WinPartsFinder) -->
-        <Grid x:Name="gridMain" ColumnDefinitions="440,5,*">
+        <Grid x:Name="gridMain" ColumnDefinitions="375,5,*">
             <!-- Left: supplier list on top, the show/hide filters below, with a divider between -->
             <Grid x:Name="gridLeft" Grid.Column="0" RowDefinitions="300,5,*">
             <!-- Mac-sized: 13px text (as in Mac apps) and tick boxes in 20-high rows, not Fluent's 14px and 32
@@ -215,18 +220,20 @@
                     </ContextMenu>
                 </DataGrid.ContextMenu>
                 <DataGrid.Columns>
-                    <!-- Widths fit the Mac's slightly wider font: "Link added", "50 / 312" and "6.7s" all show in full -->
-                    <DataGridTemplateColumn Header="Supplier" Width="124">
+                    <!-- Widths fit the Mac's slightly wider font: "No matches", "50 / 312" and "6.7s" all show in full -->
+                    <DataGridTemplateColumn Header="Supplier" Width="93">
                         <DataGridTemplateColumn.CellTemplate>
                             <DataTemplate x:DataType="local:SupplierRow">
                                 <CheckBox IsChecked="{Binding IsChecked}" Margin="6,0,0,0">
-                                    <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
+                                    <!-- One line: a long name is cut short (RS Compo…) rather than wrapping -
+                                         the tick box's template would otherwise wrap it onto a second line -->
+                                    <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" />
                                 </CheckBox>
                             </DataTemplate>
                         </DataGridTemplateColumn.CellTemplate>
                     </DataGridTemplateColumn>
                     <DataGridTextColumn Header="Mode" Binding="{Binding ModeText}" x:DataType="local:SupplierRow" Width="84" />
-                    <DataGridTextColumn Header="Status" Binding="{Binding Status}" x:DataType="local:SupplierRow" Width="88" />
+                    <DataGridTextColumn Header="Status" Binding="{Binding Status}" x:DataType="local:SupplierRow" Width="59" />
                     <DataGridTextColumn Header="Hits" Binding="{Binding Hits}" x:DataType="local:SupplierRow" Width="86" CellStyleClasses="right" />
                     <DataGridTextColumn Header="Time" Binding="{Binding Time}" x:DataType="local:SupplierRow" Width="*" />
                 </DataGrid.Columns>

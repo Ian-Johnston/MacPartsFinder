@@ -27,7 +27,7 @@ namespace MacPartsFinder;
 public partial class MainWindow : Window
 {
     // ==== THE version number - change it here for each release (to match the vX.Y.Z tag Release.bat makes) ====
-    public const string AppVersion = "V1.0.7";
+    public const string AppVersion = "V1.0.8";
     private const string TitleSuffix = "(Free for Non-Commercial Use • Support MacPartsFinder - see About)";
 
     private AppSettings _settings;
@@ -49,6 +49,7 @@ public partial class MainWindow : Window
 
     // Default layout, for Settings > Reset window layout.
     private readonly Dictionary<string, ColumnLayout> _defaultColumns;
+    private readonly List<DataGridLength> _defaultSupplierColumns;
 
     // Normal (not maximised) position and size, kept up to date for saving.
     private PixelPoint _normalPosition;
@@ -93,6 +94,7 @@ public partial class MainWindow : Window
         }
         AddColumnHeaderTips();
         _defaultColumns = CurrentColumnLayout();
+        _defaultSupplierColumns = gridSuppliers.Columns.Select(c => c.Width).ToList();
         ApplyColumnLayout(_settings.ResultColumns);
         ApplyThumbnailSetting();
         _images.ThumbnailReady += Images_ThumbnailReady;
@@ -206,8 +208,8 @@ public partial class MainWindow : Window
     private void ResetWindowLayout()
     {
         WindowState = WindowState.Normal;
-        Width = 1264;
-        Height = 681;
+        Width = 1313;
+        Height = 742;
         var screen = Screens.ScreenFromWindow(this) ?? Screens.Primary;
         if (screen != null)
         {
@@ -215,9 +217,14 @@ public partial class MainWindow : Window
             Position = new PixelPoint(area.X + (area.Width - (int)(Width * screen.Scaling)) / 2,
                                       area.Y + (area.Height - (int)(Height * screen.Scaling)) / 2);
         }
-        gridMain.ColumnDefinitions[0].Width = new GridLength(440);
+        gridMain.ColumnDefinitions[0].Width = new GridLength(375);
         gridLeft.RowDefinitions[0].Height = new GridLength(300);
         ApplyColumnLayout(_defaultColumns);
+        // The supplier list's columns aren't saved, but may have been dragged since the app started.
+        for (var i = 0; i < gridSuppliers.Columns.Count && i < _defaultSupplierColumns.Count; i++)
+        {
+            gridSuppliers.Columns[i].Width = _defaultSupplierColumns[i];
+        }
     }
 
     /// <summary>Saves the settings, with the window layout and supplier ticks. Returns an error message, or "" if all went well.</summary>
@@ -740,7 +747,7 @@ public partial class MainWindow : Window
     private void UpdateTypesButton()
     {
         btnTypes.IsEnabled = !_busy && _rows.Any(r => !r.LinkOnly);
-        btnTypes.Content = _hiddenTypes.Count > 0 ? $"Types ({_hiddenTypes.Count} hidden)…" : "Types…";
+        btnTypes.Content = _hiddenTypes.Count > 0 ? $"Types ({_hiddenTypes.Count} hidden)" : "Types";
     }
 
     /// <summary>
@@ -1566,7 +1573,7 @@ public partial class MainWindow : Window
         if (!s.IsConfigured)
         {
             added.Add(AddResult(s.MakeLinkResult(query), SeqFor(s, 0)));
-            item.Status = "Link added";
+            item.Status = "Link";
             ApplyFilter(); // (also re-applies the column sort)
             return;
         }
@@ -1991,7 +1998,7 @@ public partial class MainWindow : Window
     private void UpdateBomButtons()
     {
         btnAddToBom.IsEnabled = SelectedPartRows().Count > 0;
-        btnBom.Content = $"BOM ({_bomWindow.Bom.Lines.Count})…";
+        btnBom.Content = $"BOM ({_bomWindow.Bom.Lines.Count})";
     }
 
     private void GridResults_SelectionChanged(object? sender, SelectionChangedEventArgs e) =>

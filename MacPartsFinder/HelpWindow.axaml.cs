@@ -19,23 +19,23 @@ public partial class HelpWindow : Window
 # GETTING STARTED
 MacPartsFinder searches several component suppliers at once and puts stock, prices, minimum order and lifecycle status side by side in one grid. It's the Mac edition of WinPartsFinder.
 
-- Click **Settings…** and enter your API keys - click **API Help** in Settings for step-by-step instructions. Without keys, suppliers still appear as website links.
+- Click **Settings** and enter your API keys - click **API Help** in Settings for step-by-step instructions. Without keys, suppliers still appear as website links.
 - Type a part number or some keywords in the **Search** box, e.g. LM358 or 100nF 50V 0603, and press **Return**.
 - Results arrive from each supplier as soon as it answers. Click any column header to sort, e.g. by Price or Stock.
 
 # API KEYS
-Mouser, DigiKey, element14 (Farnell, CPC + Newark) and TME have free APIs, and each user needs their own keys. The step-by-step instructions for getting them are in a separate window: click **Settings…**, then **API Help**. It can stay open beside Settings while you paste the keys in.
+Mouser, DigiKey, element14 (Farnell, CPC + Newark) and TME have free APIs, and each user needs their own keys. The step-by-step instructions for getting them are in a separate window: click **Settings**, then **API Help**. It can stay open beside Settings while you paste the keys in.
 
 # SEARCHING
 - **Keyword** searches descriptions and part numbers. **Manufacturer part no.** looks for parts whose manufacturer part number starts with what you typed.
-- Keyword searches are matched by each supplier's own search, so a part number can also bring back its close relatives - e.g. LT1121CST-3.3**#PBF** also finds the **#TRPBF** (tape and reel) version of the same chip. Use **Advanced… > Exact manufacturer part no.** for only that exact number.
+- Keyword searches are matched by each supplier's own search, so a part number can also bring back its close relatives - e.g. LT1121CST-3.3**#PBF** also finds the **#TRPBF** (tape and reel) version of the same chip. Use **Advanced > Exact manufacturer part no.** for only that exact number.
 - **Max/supp.** is how many results are fetched from each supplier per search, up to 50. Suppliers don't send more than 50 at a time - use **Load more** for the next batch.
 - **Cancel** stops any searches still running.
 - **Recent searches:** click the **arrow** at the right of the Search box (or press **⌥↓**) to see your last 30 searches. Click one to put it in the box - change the search type or edit it if you like, then press **Return** or click **Search**. **Esc** closes the list.
 - As you type, matching previous searches are also suggested.
 
 # ADVANCED SEARCH
-Click **Advanced…** next to Search, or press **⌘F**. While MacPartsFinder is open, the window remembers your choices from last time; each time you start the app it begins fresh. Results go into the same grid, and the bottom status line lists the Advanced options used. A plain **Search** afterwards goes back to normal.
+Click **Advanced** next to Search, or press **⌘F**. While MacPartsFinder is open, the window remembers your choices from last time; each time you start the app it begins fresh. Results go into the same grid, and the bottom status line lists the Advanced options used. A plain **Search** afterwards goes back to normal.
 - **Search type:** **Keyword**; **Manufacturer part no. (starts with)**; **Exact manufacturer part no.** (only parts whose number matches exactly, ignoring spaces); or **Supplier order code**, e.g. a Farnell 3117070 or Mouser 595-LM358DR. A code belongs to one supplier: MacPartsFinder finds it there, reads the manufacturer part number, then searches every other ticked supplier for that exact part.
 - **In stock only** and **RoHS compliant only** are passed to each supplier's own search, so you get a full batch of matching parts. TME has no RoHS option, so it ignores that box. (**In stock only** on the main window is different: it only hides out-of-stock rows already found.)
 - **Active parts only** is under the supplier list on the main window (see **The filters under the supplier list**).
@@ -108,16 +108,16 @@ When a supplier has more matches than it sent, its **Hits** shows e.g. **50 / 31
 # FILTERING AND EXPORT
 - **In stock only**, **Active parts only** and the **Status** filters are under the supplier list - see **The filters under the supplier list**.
 - **Prices in GBP** (under the supplier list; the currency is chosen in Settings) shows every price in one currency, so you can compare suppliers and sort by price properly. It uses the European Central Bank's daily exchange rates, fetched when you tick it and then at most every 12 hours - the last rates are saved, so it still works offline. Converted prices are **purple** and the Price column says e.g. **Price (1) GBP**; prices already in your currency stay as they are. Hover over a purple price to see the supplier's own price and the rate used. Converted prices are approximate - the supplier's own rate, VAT and import charges will differ. Export CSV also saves the supplier's own prices.
-- **Types…** lists every type of part in the results (e.g. Analogue to Digital Converter, Evaluation Kit, Flip-Flops) with how many parts and which suppliers. Untick the ones you don't want and click **OK** to hide them; tick them again to bring them back. The button shows how many types are hidden, and a new search shows every type again. Each supplier words types its own way (Farnell: Analogue to Digital Converter, Mouser: Analog to Digital Converters - ADC), so similar ones appear separately - click **Type** in the window to sort them together.
+- **Types** lists every type of part in the results (e.g. Analogue to Digital Converter, Evaluation Kit, Flip-Flops) with how many parts and which suppliers. Untick the ones you don't want and click **OK** to hide them; tick them again to bring them back. The button shows how many types are hidden, and a new search shows every type again. Each supplier words types its own way (Farnell: Analogue to Digital Converter, Mouser: Analog to Digital Converters - ADC), so similar ones appear separately - click **Type** in the window to sort them together.
 - **Filter** narrows the current results as you type. It matches the supplier, both part numbers, manufacturer, type, package and description. It is not case sensitive.
-- **Total parts = …** in the bottom-right corner counts every part found in this search (website-link rows aren't counted). When Filter, the filters under the supplier list, Types…, removed rows or unticked suppliers hide some, it adds **(showing …)** for how many you can see.
+- **Total parts = …** in the bottom-right corner counts every part found in this search (website-link rows aren't counted). When Filter, the filters under the supplier list, Types, removed rows or unticked suppliers hide some, it adds **(showing …)** for how many you can see.
 - If parts were found but **all** of them are hidden, the status line at the bottom says what's hiding them, e.g. All 5 are hidden by In stock only (none are in stock).
-- **Export CSV…** saves the rows currently shown, including their **#**, product and datasheet links, to a file that opens in Numbers or Excel.
+- **Export CSV** saves the rows currently shown, including their **#**, product and datasheet links, to a file that opens in Numbers or Excel.
 
 # BOM (BILL OF MATERIALS)
 Build up a shopping list across as many searches as you like, then work down it to buy each part on the supplier's website.
 - **Adding parts:** select one or more results and click **Add to BOM** on the toolbar, or right-click them and choose **Add to BOM**. Website-link rows can't be added. Adding a part that's already in the BOM adds to its quantity instead. The quantity starts at 1 - or at the Advanced search **Quantity needed** if one is set - and never below the part's minimum order.
-- **BOM (5)…** on the toolbar shows how many lines the BOM has and opens it. The BOM window can stay open while you search; closing it just hides it.
+- **BOM (5)** on the toolbar shows how many lines the BOM has and opens it. The BOM window can stay open while you search; closing it just hides it.
 - Each line shows the supplier, the **Supplier Part No.** (their order code) and the **Mfr Part No.**, the description, quantity, prices and a link. Each supplier's parts are kept together, so you can buy from one supplier at a time. Click **Open** (or double-click a line) to open the part's page on the supplier's website. Right-click a line to copy its supplier or manufacturer part number.
 - **Qty:** click the selected line's quantity and type a new one, or select lines and use **Qty −** / **Qty +**. The price each follows the supplier's price breaks for that quantity. Setting it to 0 asks whether to remove the line.
 - **The tick box** at the left of each line counts it in the totals. Untick a line to grey it out and leave it out of the totals (**Space** ticks or unticks the selected lines).
@@ -161,7 +161,7 @@ Build up a shopping list across as many searches as you like, then work down it 
 # GETTING HELP
 - Hover over any button, box or column header for a tip about what it does.
 - This Help window can stay open while you use MacPartsFinder. **Esc** closes it, and the About window too.
-- **About…** shows the version, licence and credits, and has the **Donate via PayPal** button. The version number is also in the title bar.
+- **About** shows the version, licence and credits, and has the **Donate via PayPal** button. The version number is also in the title bar.
 ";
 
     // API Help (opened from Settings): how to get each supplier's keys. Same markup as above.
