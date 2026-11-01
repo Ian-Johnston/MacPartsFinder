@@ -11,6 +11,7 @@ public partial class AboutWindow : Window
     public AboutWindow()
     {
         InitializeComponent();
+        lblVersion.Text = MainWindow.AppVersion;
     }
 
     private void Link_Click(object? sender, RoutedEventArgs e)
