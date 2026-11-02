@@ -27,6 +27,11 @@
             <Setter Property="VerticalAlignment" Value="Center" />
             <Setter Property="Padding" Value="0" />
         </Style>
+        <!-- The "(international site ...)" note just after each Get a key link -->
+        <Style Selector="Grid#keys > StackPanel.head > TextBlock.note">
+            <Setter Property="FontWeight" Value="Normal" />
+            <Setter Property="Margin" Value="-10,0,0,0" />
+        </Style>
         <Style Selector="Grid#keys > StackPanel.head.next">
             <Setter Property="Margin" Value="0,10,0,0" />
         </Style>
@@ -79,8 +84,9 @@
             <!-- Mouser -->
             <StackPanel Grid.Row="0" Grid.ColumnSpan="3" Classes="head">
                 <TextBlock Text="Mouser" />
-                <HyperlinkButton Content="Get a key" Tag="https://www.mouser.co.uk/api-hub/" Click="KeyLink_Click"
+                <HyperlinkButton Content="Get a key" Tag="https://www.mouser.com/api-hub/" Click="KeyLink_Click"
                                  ToolTip.Tip="Opens Mouser's API Hub - sign up there for a free Search API key." />
+                <TextBlock Classes="note" Text="(international site - check for your local site)" />
             </StackPanel>
             <TextBlock Grid.Row="1" Classes="sub" Text="Search API key:" />
             <TextBox Grid.Row="1" Grid.Column="1" x:Name="txtMouserKey" PasswordChar="•"
@@ -91,6 +97,7 @@
                 <TextBlock Text="DigiKey" />
                 <HyperlinkButton Content="Get a key" Tag="https://developer.digikey.com/" Click="KeyLink_Click"
                                  ToolTip.Tip="Opens the DigiKey developer portal - create an Organization, then a Production App." />
+                <TextBlock Classes="note" Text="(international site - check for your local site)" />
             </StackPanel>
             <TextBlock Grid.Row="3" Classes="sub" Text="Client ID:" />
             <TextBox Grid.Row="3" Grid.Column="1" x:Name="txtDkClientId" PasswordChar="•"
@@ -112,6 +119,7 @@
                 <TextBlock Text="element14 - Farnell, CPC and Newark (one key for all three)" />
                 <HyperlinkButton Content="Get a key" Tag="https://partner.element14.com/" Click="KeyLink_Click"
                                  ToolTip.Tip="Opens the element14 partner portal - register an application for a free key." />
+                <TextBlock Classes="note" Text="(international site - check for your local site)" />
             </StackPanel>
             <TextBlock Grid.Row="7" Classes="sub" Text="API key:" />
             <TextBox Grid.Row="7" Grid.Column="1" x:Name="txtE14Key" PasswordChar="•"
@@ -124,8 +132,9 @@
             <!-- TME -->
             <StackPanel Grid.Row="9" Grid.ColumnSpan="3" Classes="head next">
                 <TextBlock Text="TME" />
-                <HyperlinkButton Content="Get a key" Tag="https://developers.tme.eu/en" Click="KeyLink_Click"
+                <HyperlinkButton Content="Get a key" Tag="https://developers.tme.eu/" Click="KeyLink_Click"
                                  ToolTip.Tip="Opens the TME developer site - create an application there, then generate a private key (see API Help)." />
+                <TextBlock Classes="note" Text="(international site - check for your local site)" />
             </StackPanel>
             <TextBlock Grid.Row="10" Classes="sub" Text="Token:" />
             <TextBox Grid.Row="10" Grid.Column="1" x:Name="txtTmeToken" PasswordChar="•"
@@ -163,7 +172,7 @@
         </Grid>
 
         <TextBlock DockPanel.Dock="Top" Margin="0,10,0,6" TextWrapping="Wrap"
-                   Text="Suppliers and website search URLs - {0} is replaced by the search text. Add your own suppliers here:" />
+                   Text="Suppliers and website search URLs - {0} is replaced by the search text. Add your own suppliers here - check/change your locale url accordingly:" />
 
         <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Spacing="6" Margin="0,12,0,0">
             <Button Content="Add supplier" MinWidth="110" Click="BtnAddSupplier_Click"

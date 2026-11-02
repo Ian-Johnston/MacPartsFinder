@@ -11,7 +11,7 @@ public partial class AboutWindow : Window
     public AboutWindow()
     {
         InitializeComponent();
-        lblVersion.Text = MainWindow.AppVersion;
+        lblVersion.Text = "Version Number: " + MainWindow.AppVersion.TrimStart('V', 'v'); // "V1.0.5" shows as 1.0.5
     }
 
     private void Link_Click(object? sender, RoutedEventArgs e)

@@ -28,7 +28,7 @@
                     <TextBlock Text="MacPartsFinder" FontSize="32" FontWeight="Bold" />
                     <TextBlock Text="™" FontSize="17" VerticalAlignment="Top" Margin="1,4,0,0" />
                     <TextBlock Text="© 2026 Ian Johnston" FontSize="11" VerticalAlignment="Bottom" Margin="10,0,0,8" />
-                    <!-- Set in code from MainWindow.AppVersion, e.g. V1.0.5 -->
+                    <!-- Set in code from MainWindow.AppVersion, e.g. Version Number: 1.0.5 -->
                     <TextBlock x:Name="lblVersion" FontSize="15" FontWeight="Bold" VerticalAlignment="Bottom" Margin="36,0,0,6" />
                 </StackPanel>
 

@@ -13,7 +13,7 @@ using static MacPartsFinder.WebHelper;
 namespace MacPartsFinder;
 
 /// <summary>
-/// Mouser Search API v1. Free key from https://www.mouser.co.uk/api-hub/ (Search API).
+/// Mouser Search API v1. Free key from https://www.mouser.com/api-hub/ (Search API).
 /// Prices come back in the currency of the account the key was registered with.
 /// </summary>
 public class MouserSupplier : ApiSupplier
