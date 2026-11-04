@@ -4,7 +4,7 @@
         x:Class="MacPartsFinder.MainWindow"
         Width="1313" Height="742" MinWidth="800" MinHeight="400"
         WindowStartupLocation="CenterScreen"
-        Title="MacPartsFinder">
+        Title="Mac-PartsFinder">
 
     <Window.Styles>
         <Style Selector="DockPanel#toolbar > :is(Control), WrapPanel#toolbarLeft > :is(Control)">
@@ -151,7 +151,7 @@
         <!-- Toolbar: same order as WinPartsFinder -->
         <DockPanel x:Name="toolbar" DockPanel.Dock="Top" Margin="6,4,6,2">
             <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="4" VerticalAlignment="Top" Margin="6,2,0,2">
-                <Button x:Name="btnHelp" Content="Help" Click="BtnHelp_Click" ToolTip.Tip="How to use MacPartsFinder." />
+                <Button x:Name="btnHelp" Content="Help" Click="BtnHelp_Click" ToolTip.Tip="How to use Mac-PartsFinder." />
                 <Button x:Name="btnAbout" Content="About" Click="BtnAbout_Click" ToolTip.Tip="Version, credits, licence and donate." />
             </StackPanel>
             <WrapPanel x:Name="toolbarLeft">

@@ -2,14 +2,14 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:local="using:MacPartsFinder"
              x:Class="MacPartsFinder.App"
-             Name="MacPartsFinder"
+             Name="Mac-PartsFinder"
              RequestedThemeVariant="Light">
              <!-- Light, Soft grey, Dark grey or Dark is set from the Theme setting when the main window opens (AppThemes). -->
 
     <!-- The Mac's app menu (MacPartsFinder > About MacPartsFinder). Windows ignores it. -->
     <NativeMenu.Menu>
         <NativeMenu>
-            <NativeMenuItem Header="About MacPartsFinder" Click="AboutMenu_Click" />
+            <NativeMenuItem Header="About Mac-PartsFinder" Click="AboutMenu_Click" />
         </NativeMenu>
     </NativeMenu.Menu>
 

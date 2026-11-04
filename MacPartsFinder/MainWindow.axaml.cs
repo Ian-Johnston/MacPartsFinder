@@ -28,8 +28,8 @@ namespace MacPartsFinder;
 public partial class MainWindow : Window
 {
     // ==== THE version number - change it here for each release (to match the vX.Y.Z tag Release.bat makes) ====
-    public const string AppVersion = "V1.0.11";
-    private const string TitleSuffix = "(Free for Non-Commercial Use • Support MacPartsFinder - see About)";
+    public const string AppVersion = "V1.0.12";
+    private const string TitleSuffix = "(Free for Non-Commercial Use • Support Mac-PartsFinder - see About)";
 
     private AppSettings _settings;
     private List<Supplier> _suppliers = new();
@@ -62,7 +62,7 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
         _settings = AppSettings.Load();
-        Title = $"MacPartsFinder - {AppVersion}      {TitleSuffix}";
+        Title = $"Mac-PartsFinder - {AppVersion}      {TitleSuffix}";
         if (Application.Current != null)
             Application.Current.RequestedThemeVariant = AppThemes.Variant(_settings.AppTheme);
 
@@ -2210,7 +2210,7 @@ public partial class MainWindow : Window
         var file = await StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
         {
             Title = "Export CSV",
-            SuggestedFileName = $"MacPartsFinder {safeName} {DateTime.Now:yyyy-MM-dd HHmm}.csv",
+            SuggestedFileName = $"Mac-PartsFinder {safeName} {DateTime.Now:yyyy-MM-dd HHmm}.csv",
             DefaultExtension = "csv",
             FileTypeChoices = new[] { new FilePickerFileType("CSV file") { Patterns = new[] { "*.csv" } } }
         });
